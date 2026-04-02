@@ -94,9 +94,11 @@ def run_biencoder_retrieval(
     model, embeddings = encode_chunks(chunks, model_name=model_name)
     profiler.end_stage("biencoder_encoding")
 
-    # Build FAISS index
+    # Build FAISS index and immediately free the raw embeddings (FAISS keeps its own copy)
     profiler.start_stage("faiss_indexing")
     index = build_faiss_index(embeddings)
+    del embeddings
+    gc.collect()
     profiler.end_stage("faiss_indexing")
 
     # Save FAISS index to disk for size measurement
@@ -121,7 +123,7 @@ def run_biencoder_retrieval(
     profiler.end_stage("biencoder_retrieval")
 
     # Free bi-encoder resources to reclaim memory before ColBERT stage
-    del model, embeddings, index
+    del model, index
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

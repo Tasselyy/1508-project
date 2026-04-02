@@ -42,5 +42,6 @@ temp/
 
 # Data cache & results (generated)
 data/
-results/
 .ragatouille/
+results/faiss_index/
+results/colbert_index/

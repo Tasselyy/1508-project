@@ -6,18 +6,66 @@ import time
 
 import torch
 
-# Monkey-patch ColBERT to skip C++ extension compilation on Windows (no MSVC needed).
-# Provides a pure-Python fallback for segmented_maxsim.
+# ---------------------------------------------------------------------------
+# Monkey-patch ColBERT for Windows (no MSVC / CUDA_HOME).
+#
+# ColBERT JIT-compiles C++ extensions at runtime.  On Windows without a
+# C++ toolchain this always fails.  We skip the JIT compilation and provide
+# pure-Python / numpy fallbacks for the four affected classes:
+#   ColBERT          – segmented_maxsim   (CPU path, has built-in torch fallback)
+#   ResidualCodec    – packbits, decompress_residuals  (GPU path)
+#   StridedTensor    – segmented_lookup   (CPU path)
+#   IndexScorer      – filter_pids, decompress_residuals (CPU path)
+#
+# The GPU PLAID indexer OOMs on 8 GB VRAM; RAGatouille catches this and
+# retries with CPU FAISS.  The retry still marks use_gpu=True (GPU exists)
+# so ResidualCodec needs GPU-side fallbacks for packbits / decompress.
+# ---------------------------------------------------------------------------
+import numpy as np
 import colbert.modeling.colbert as _cm
+import colbert.indexing.codecs.residual as _cr
+import colbert.search.strided_tensor as _st
+import colbert.search.index_storage as _is
 
+# 1. Skip JIT compilation on all four classes
 @classmethod
 def _patched_try_load(cls, use_gpu):
-    if hasattr(cls, "loaded_extensions") or use_gpu:
-        return
-    # Pure-Python fallback: ColBERT will use the torch-based path instead
-    cls.loaded_extensions = True
+    if not hasattr(cls, "loaded_extensions"):
+        cls.loaded_extensions = True
 
 _cm.ColBERT.try_load_torch_extensions = _patched_try_load
+_cr.ResidualCodec.try_load_torch_extensions = _patched_try_load
+_st.StridedTensor.try_load_torch_extensions = _patched_try_load
+_is.IndexScorer.try_load_torch_extensions = _patched_try_load
+
+# 2. Provide pure-Python fallbacks for ResidualCodec GPU code-paths
+#    These are only hit when GPU indexing OOMs and the FAISS retry runs
+#    with use_gpu=True.
+
+@staticmethod
+def _fallback_packbits(tensor):
+    """Pure-Python replacement for the CUDA packbits kernel."""
+    packed = np.packbits(np.asarray(tensor.contiguous().cpu()))
+    return torch.as_tensor(packed, dtype=torch.uint8)
+
+@staticmethod
+def _fallback_decompress_residuals(
+    residuals, bucket_weights, reversed_bit_map,
+    decompression_lookup_table, codes, centroids, dim, nbits,
+):
+    """Pure-Python replacement for the CUDA decompress_residuals kernel."""
+    centroids_ = centroids[codes.long()]
+    residuals_ = reversed_bit_map[residuals.long()]
+    residuals_ = decompression_lookup_table[residuals_.long()]
+    residuals_ = residuals_.reshape(residuals_.shape[0], -1)
+    residuals_ = bucket_weights[residuals_.long()]
+    centroids_ = centroids_ + residuals_
+    return centroids_
+
+if not hasattr(_cr.ResidualCodec, "packbits"):
+    _cr.ResidualCodec.packbits = _fallback_packbits
+if not hasattr(_cr.ResidualCodec, "decompress_residuals"):
+    _cr.ResidualCodec.decompress_residuals = _fallback_decompress_residuals
 
 from ragatouille import RAGPretrainedModel
 
@@ -34,8 +82,14 @@ def build_colbert_index(
     chunks: list[dict],
     index_path: str = "results/colbert_index",
     model_name: str = "colbert-ir/colbertv2.0",
+    bsize: int = 32,
 ) -> RAGPretrainedModel:
-    """Create a ColBERTv2 PLAID index from corpus chunks via RAGatouille."""
+    """Create a ColBERTv2 PLAID index from corpus chunks via RAGatouille.
+
+    Args:
+        bsize: Batch size for ColBERT encoding during indexing. Lower values
+               reduce peak VRAM usage (default 32, try 16 for 8GB VRAM).
+    """
     rag = RAGPretrainedModel.from_pretrained(model_name)
 
     texts = [c["text"] for c in chunks]
@@ -47,6 +101,7 @@ def build_colbert_index(
         index_name="colbert_benchmark",
         split_documents=False,
         max_document_length=180,
+        bsize=bsize,
     )
     return rag
 
@@ -107,7 +162,8 @@ def run_colbert_retrieval(
     # Index corpus
     profiler.start_stage("colbert_indexing")
     try:
-        rag = build_colbert_index(chunks, index_path=index_path, model_name=model_name)
+        bsize = config.get("colbert", {}).get("bsize", 32)
+        rag = build_colbert_index(chunks, index_path=index_path, model_name=model_name, bsize=bsize)
     except (RuntimeError, MemoryError) as e:
         profiler.end_stage("colbert_indexing")
         msg = (

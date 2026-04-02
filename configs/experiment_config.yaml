@@ -19,6 +19,9 @@ models:
   biencoder: "sentence-transformers/all-MiniLM-L6-v2"
   colbert: "colbert-ir/colbertv2.0"
 
+colbert:
+  bsize: 32                   # Encoding batch size during indexing (lower = less VRAM; try 16 for 8GB)
+
 paths:
   results_dir: "results"
   faiss_index_dir: "results/faiss_index"

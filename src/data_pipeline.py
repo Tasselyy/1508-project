@@ -1,5 +1,6 @@
 """Data pipeline: KILT NQ loading, reduced corpus construction, chunking, NER classification, ground-truth extraction."""
 
+import gc
 import json as _json
 import random
 from pathlib import Path
@@ -274,39 +275,52 @@ def extract_ground_truth(query_record: dict) -> set[str]:
 def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     """Execute the full data pipeline, instrumented with profiler.
 
-    Pipeline order (optimized for speed):
-    1. Load NQ queries → NER classify → sample balanced groups
+    Pipeline order (optimized for memory):
+    1. Load NQ queries → random pre-sample → NER classify on small subset → balanced sample
     2. Extract gold page IDs for sampled queries only (much fewer pages to fetch)
     3. Build corpus: gold pages for sampled queries + distractors
     4. Chunk corpus → extract ground-truth labels
 
-    Returns dict with keys: corpus_df, chunks, sampled_queries
+    Returns dict with keys: chunks, sampled_queries
     """
+    sample_per_group = config["queries"]["sample_size_per_group"]
+    query_seed = config["queries"].get("seed", 42)
+
     # Load NQ dev set
     profiler.start_stage("data_loading")
     nq_records = load_kilt_nq_dev()
     profiler.end_stage("data_loading")
 
-    # NER classification (run early so we can sample first)
+    # Pre-sample a smaller candidate pool before running NER on all 13K records.
+    # We need sample_per_group * 2 groups in the end; take 4x headroom to ensure
+    # enough queries in each entity group after NER classification.
     profiler.start_stage("ner_classification")
+    candidate_size = min(len(nq_records), sample_per_group * 8)
+    rng = random.Random(query_seed)
+    candidates = rng.sample(nq_records, candidate_size)
+    # Free the full dataset immediately — candidates hold the only needed refs
+    del nq_records
+
     classified = classify_queries_ner(
-        nq_records,
+        candidates,
         spacy_model=config["spacy"]["model"],
         entity_threshold=config["spacy"]["entity_threshold"],
     )
+    del candidates
     profiler.end_stage("ner_classification")
 
     # Balanced sampling (before corpus construction to reduce gold page set)
     profiler.start_stage("query_sampling")
     sampled = sample_balanced_queries(
         classified,
-        sample_size_per_group=config["queries"]["sample_size_per_group"],
-        seed=config["queries"].get("seed", 42),
+        sample_size_per_group=sample_per_group,
+        seed=query_seed,
     )
     profiler.end_stage("query_sampling")
 
-    # Free full classified list and raw NQ records (sampled queries hold their own refs)
-    del classified, nq_records
+    # Free classified list (sampled queries hold their own refs)
+    del classified
+    gc.collect()
 
     # Build reduced corpus using only gold pages for sampled queries
     profiler.start_stage("corpus_construction")
@@ -318,17 +332,24 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     )
     profiler.end_stage("corpus_construction")
 
-    # Chunk corpus
+    # Chunk corpus and free DataFrame immediately
     profiler.start_stage("chunking")
     chunks = chunk_corpus(corpus_df)
+    corpus_size = len(corpus_df)
+    del corpus_df
+    gc.collect()
     profiler.end_stage("chunking")
 
     # Add ground-truth chunk IDs to each sampled query
     for q in sampled:
         q["ground_truth_chunk_ids"] = list(extract_ground_truth(q))
 
+    # Drop heavy 'record' reference from sampled queries — no longer needed
+    for q in sampled:
+        q.pop("record", None)
+
     # Store corpus metadata
-    profiler.data["metadata"]["corpus_size"] = len(corpus_df)
+    profiler.data["metadata"]["corpus_size"] = corpus_size
     profiler.data["metadata"]["total_chunks"] = len(chunks)
     profiler.data["metadata"]["total_queries"] = len(sampled)
     profiler.data["metadata"]["queries_per_group"] = {
@@ -337,7 +358,6 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     }
 
     return {
-        "corpus_df": corpus_df,
         "chunks": chunks,
         "sampled_queries": sampled,
     }

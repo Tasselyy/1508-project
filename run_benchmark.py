@@ -24,18 +24,14 @@ def main():
     # === 1. Data Pipeline ===
     print("\n=== 1. Data Pipeline ===")
     pipeline_out = run_data_pipeline(config, profiler)
-    corpus_df = pipeline_out["corpus_df"]
     chunks = pipeline_out["chunks"]
     sampled_queries = pipeline_out["sampled_queries"]
-    print(f"  Corpus pages: {len(corpus_df)}")
+    del pipeline_out
+    gc.collect()
     print(f"  Total chunks: {len(chunks)}")
     print(f"  Sampled queries: {len(sampled_queries)}")
     print(f"    single-entity: {sum(1 for q in sampled_queries if q['entity_group'] == 'single-entity')}")
     print(f"    multi-entity:  {sum(1 for q in sampled_queries if q['entity_group'] == 'multi-entity')}")
-
-    # corpus_df is no longer needed after chunking — free it
-    del corpus_df, pipeline_out
-    gc.collect()
 
     # === 2. Bi-Encoder Retrieval ===
     print("\n=== 2. Bi-Encoder Retrieval ===")
@@ -87,7 +83,7 @@ def main():
 
     # === 7. Profiling Summary ===
     print("\n=== 7. Profiling Summary ===")
-    with open(log_path) as f:
+    with open(log_path, encoding="utf-8") as f:
         log = json.load(f)
     for stage, info in log["stages"].items():
         vram = f", VRAM peak: {info['peak_vram_bytes']/1e9:.2f} GB" if info.get("peak_vram_bytes") else ""
