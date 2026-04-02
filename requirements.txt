@@ -1,0 +1,11 @@
+datasets>=2.14.0
+sentence-transformers>=2.2.0
+ragatouille>=0.0.8
+faiss-cpu>=1.7.4
+spacy>=3.6.0
+torch>=2.0.0
+psutil>=5.9.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+pandas>=2.0.0
+pyyaml>=6.0

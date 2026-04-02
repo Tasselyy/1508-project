@@ -1,0 +1,46 @@
+.claude/
+CLAUDE.md
+openspec/
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# uv
+uv.lock
+
+# Logs & temp
+*.log
+tmp/
+temp/
+
+# Data cache & results (generated)
+data/
+results/
+.ragatouille/

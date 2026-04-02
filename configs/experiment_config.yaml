@@ -1,0 +1,32 @@
+# ColBERT vs Bi-Encoder Retrieval Benchmark Configuration
+
+corpus:
+  target_size: 500            # Number of Wikipedia pages in reduced corpus (reduced for 8GB VRAM)
+  local_corpus_cache: "data/corpus_cache.parquet"
+  seed: 42
+
+chunking:
+  strategy: "paragraph"       # Fixed paragraph-level chunking
+
+queries:
+  sample_size_per_group: 150  # Queries per entity group (single-entity, multi-entity)
+  seed: 42
+
+retrieval:
+  k_values: [1, 5, 10, 20]
+
+models:
+  biencoder: "sentence-transformers/all-MiniLM-L6-v2"
+  colbert: "colbert-ir/colbertv2.0"
+
+paths:
+  results_dir: "results"
+  faiss_index_dir: "results/faiss_index"
+  colbert_index_dir: "results/colbert_index"
+  json_log: "results/benchmark_log.json"
+  charts_dir: "results/charts"
+  csv_output: "results/summary_statistics.csv"
+
+spacy:
+  model: "en_core_web_sm"
+  entity_threshold: 2         # 0-1 entities = single-entity, 2+ = multi-entity
