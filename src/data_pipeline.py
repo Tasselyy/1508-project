@@ -1,8 +1,10 @@
 """Data pipeline: KILT NQ loading, reduced corpus construction, chunking, NER classification, ground-truth extraction."""
 
 import gc
+import hashlib
 import json as _json
 import random
+import re
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +16,7 @@ from datasets import load_dataset
 from src.profiler import Profiler
 
 KILT_WIKIPEDIA_URL = "http://dl.fbaipublicfiles.com/KILT/kilt_knowledgesource.json"
+_SENTENCE_SPLITTER = re.compile(r"(?<=[.!?])\s+")
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +63,47 @@ def _stream_kilt_wikipedia():
                 yield _json.loads(line)
 
 
+def _cache_metadata_path(cache_path: str) -> Path:
+    return Path(f"{cache_path}.meta.json")
+
+
+def _build_cache_signature(nq_records: list[dict], target_size: int, seed: int) -> dict:
+    gold_ids = sorted(_extract_gold_page_ids(nq_records))
+    gold_digest = hashlib.sha256(",".join(map(str, gold_ids)).encode("utf-8")).hexdigest()
+    return {
+        "target_size": target_size,
+        "seed": seed,
+        "gold_page_count": len(gold_ids),
+        "gold_page_digest": gold_digest,
+    }
+
+
+def _load_cached_corpus(cache_path: str, expected_signature: dict) -> pd.DataFrame | None:
+    cache_file = Path(cache_path)
+    metadata_file = _cache_metadata_path(cache_path)
+    if not cache_file.exists() or not metadata_file.exists():
+        return None
+
+    try:
+        metadata = _json.loads(metadata_file.read_text(encoding="utf-8"))
+    except (_json.JSONDecodeError, OSError):
+        return None
+
+    if metadata != expected_signature:
+        return None
+    return pd.read_parquet(cache_file)
+
+
+def _save_cached_corpus(cache_path: str, corpus_df: pd.DataFrame, signature: dict) -> None:
+    cache_file = Path(cache_path)
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    corpus_df.to_parquet(cache_file, index=False)
+    _cache_metadata_path(cache_path).write_text(
+        _json.dumps(signature, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
 def build_reduced_corpus(
     nq_records: list[dict],
     target_size: int = 10_000,
@@ -70,9 +114,11 @@ def build_reduced_corpus(
 
     Returns a DataFrame with columns: wikipedia_id, title, text (dict with paragraph list).
     """
-    # Check cache
-    if cache_path and Path(cache_path).exists():
-        return pd.read_parquet(cache_path)
+    cache_signature = _build_cache_signature(nq_records, target_size=target_size, seed=seed)
+    if cache_path:
+        cached = _load_cached_corpus(cache_path, cache_signature)
+        if cached is not None:
+            return cached
 
     gold_ids = _extract_gold_page_ids(nq_records)
     gold_ids_remaining = set(gold_ids)
@@ -145,8 +191,7 @@ def build_reduced_corpus(
 
     # Cache for subsequent runs
     if cache_path:
-        Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(cache_path, index=False)
+        _save_cached_corpus(cache_path, df, cache_signature)
 
     return df
 
@@ -155,11 +200,75 @@ def build_reduced_corpus(
 # 3.3  Paragraph-level chunking
 # ---------------------------------------------------------------------------
 
-def chunk_corpus(corpus_df: pd.DataFrame) -> list[dict]:
-    """Chunk Wikipedia pages into paragraphs with source metadata.
+def _split_sentences(text: str) -> list[str]:
+    sentences = [part.strip() for part in _SENTENCE_SPLITTER.split(text) if part.strip()]
+    return sentences or [text.strip()]
+
+
+def _sentence_window_chunks(
+    paragraph_text: str,
+    window_size: int,
+    stride: int,
+) -> list[str]:
+    sentences = _split_sentences(paragraph_text)
+    if len(sentences) <= window_size:
+        return [" ".join(sentences).strip()]
+
+    chunks = []
+    step = max(1, stride)
+    for start in range(0, len(sentences), step):
+        window = sentences[start:start + window_size]
+        if not window:
+            continue
+        chunks.append(" ".join(window).strip())
+        if start + window_size >= len(sentences):
+            break
+    return [chunk for chunk in chunks if chunk]
+
+
+def _adaptive_sentence_chunks(
+    paragraph_text: str,
+    min_words: int,
+    max_words: int,
+) -> list[str]:
+    sentences = _split_sentences(paragraph_text)
+    chunks: list[str] = []
+    current: list[str] = []
+    current_words = 0
+
+    for sentence in sentences:
+        sentence_words = len(sentence.split())
+        if current and current_words >= min_words and current_words + sentence_words > max_words:
+            chunks.append(" ".join(current).strip())
+            current = []
+            current_words = 0
+
+        current.append(sentence)
+        current_words += sentence_words
+
+        if current_words >= max_words:
+            chunks.append(" ".join(current).strip())
+            current = []
+            current_words = 0
+
+    if current:
+        chunks.append(" ".join(current).strip())
+
+    return [chunk for chunk in chunks if chunk]
+
+
+def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -> list[dict]:
+    """Chunk Wikipedia pages into retrieval units with source metadata.
 
     Returns list of dicts: {chunk_id, wikipedia_id, paragraph_index, text}
     """
+    chunking_config = chunking_config or {}
+    strategy = chunking_config.get("strategy", "paragraph")
+    sentence_window_size = max(1, int(chunking_config.get("sentence_window_size", 3)))
+    sentence_window_stride = max(1, int(chunking_config.get("sentence_window_stride", 2)))
+    adaptive_min_words = max(1, int(chunking_config.get("adaptive_min_words", 80)))
+    adaptive_max_words = max(adaptive_min_words, int(chunking_config.get("adaptive_max_words", 160)))
+
     chunks: list[dict] = []
     for _, row in corpus_df.iterrows():
         wid = int(row["wikipedia_id"])
@@ -176,15 +285,39 @@ def chunk_corpus(corpus_df: pd.DataFrame) -> list[dict]:
             para_text = para_text.strip()
             if not para_text:
                 continue
-            chunk_id = f"{wid}_{para_idx}"
-            chunks.append(
-                {
-                    "chunk_id": chunk_id,
-                    "wikipedia_id": wid,
-                    "paragraph_index": para_idx,
-                    "text": para_text,
-                }
-            )
+
+            if strategy == "paragraph":
+                derived_chunks = [para_text]
+            elif strategy == "sentence_window":
+                derived_chunks = _sentence_window_chunks(
+                    para_text,
+                    window_size=sentence_window_size,
+                    stride=sentence_window_stride,
+                )
+            elif strategy == "adaptive_sentence":
+                derived_chunks = _adaptive_sentence_chunks(
+                    para_text,
+                    min_words=adaptive_min_words,
+                    max_words=adaptive_max_words,
+                )
+            else:
+                raise ValueError(f"Unsupported chunking strategy: {strategy}")
+
+            for sub_idx, chunk_text in enumerate(derived_chunks):
+                chunk_text = chunk_text.strip()
+                if not chunk_text:
+                    continue
+                suffix = "" if strategy == "paragraph" else f"_c{sub_idx}"
+                chunk_id = f"{wid}_{para_idx}{suffix}"
+                chunks.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "wikipedia_id": wid,
+                        "paragraph_index": para_idx,
+                        "text": chunk_text,
+                        "chunking_strategy": strategy,
+                    }
+                )
     return chunks
 
 
@@ -334,7 +467,7 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
 
     # Chunk corpus and free DataFrame immediately
     profiler.start_stage("chunking")
-    chunks = chunk_corpus(corpus_df)
+    chunks = chunk_corpus(corpus_df, chunking_config=config.get("chunking", {}))
     corpus_size = len(corpus_df)
     del corpus_df
     gc.collect()
@@ -352,6 +485,7 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     profiler.data["metadata"]["corpus_size"] = corpus_size
     profiler.data["metadata"]["total_chunks"] = len(chunks)
     profiler.data["metadata"]["total_queries"] = len(sampled)
+    profiler.data["metadata"]["chunking"] = config.get("chunking", {})
     profiler.data["metadata"]["queries_per_group"] = {
         g: sum(1 for q in sampled if q["entity_group"] == g)
         for g in {"single-entity", "multi-entity"}

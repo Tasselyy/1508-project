@@ -7,6 +7,10 @@ corpus:
 
 chunking:
   strategy: "paragraph"       # Fixed paragraph-level chunking
+  sentence_window_size: 3     # Number of sentences per chunk for sentence_window
+  sentence_window_stride: 2   # Sliding stride for sentence_window
+  adaptive_min_words: 80      # Lower target for adaptive_sentence chunks
+  adaptive_max_words: 160     # Upper target for adaptive_sentence chunks
 
 queries:
   sample_size_per_group: 150  # Queries per entity group (single-entity, multi-entity)
