@@ -70,8 +70,17 @@ def compute_recall_at_k(retrieved_ids: list[str], ground_truth_ids: set[str], k:
     """Compute Recall@k: fraction of ground-truth items found in top-k retrieved."""
     if not ground_truth_ids:
         return 0.0
-    top_k = set(retrieved_ids[:k])
-    return len(top_k & ground_truth_ids) / len(ground_truth_ids)
+    top_k = retrieved_ids[:k]
+
+    matched = 0
+    for ground_truth_id in ground_truth_ids:
+        if any(
+            retrieved_id == ground_truth_id
+            or retrieved_id.startswith(f"{ground_truth_id}_c")
+            for retrieved_id in top_k
+        ):
+            matched += 1
+    return matched / len(ground_truth_ids)
 
 
 # ---------------------------------------------------------------------------

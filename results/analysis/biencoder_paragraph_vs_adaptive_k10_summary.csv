@@ -1,0 +1,4 @@
+entity_group,outcome,count,mean_delta
+multi-entity,unchanged,21,0.0
+single-entity,regressed,1,-0.33333333333333337
+single-entity,unchanged,29,0.0

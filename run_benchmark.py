@@ -1,84 +1,41 @@
 """Run the full ColBERTv2 vs Bi-Encoder benchmark end-to-end."""
 
-import gc
+import argparse
 import json
 
-import yaml
-
-from src.profiler import Profiler
-from src.data_pipeline import run_data_pipeline
-from src.biencoder_retrieval import run_biencoder_retrieval
-from src.colbert_retrieval import run_colbert_retrieval
-from src.evaluation import run_evaluation
-from src.visualize import run_visualization
+from src.benchmark_runner import load_config, run_full_benchmark
 
 
 def main():
-    # Load config
-    with open("configs/experiment_config.yaml", "r") as f:
-        config = yaml.safe_load(f)
+    parser = argparse.ArgumentParser(description="Run the retrieval benchmark with a YAML config.")
+    parser.add_argument(
+        "--config",
+        default="configs/experiment_config.yaml",
+        help="Path to the YAML configuration file.",
+    )
+    args = parser.parse_args()
+
+    config = load_config(args.config)
     print("Config loaded.")
+    print("\n=== Running Benchmark ===")
+    result = run_full_benchmark(config)
+    chunks = result["chunks"]
+    sampled_queries = result["sampled_queries"]
+    summary = result["summary"]
+    log_path = result["log_path"]
 
-    profiler = Profiler(config=config)
-
-    # === 1. Data Pipeline ===
-    print("\n=== 1. Data Pipeline ===")
-    pipeline_out = run_data_pipeline(config, profiler)
-    chunks = pipeline_out["chunks"]
-    sampled_queries = pipeline_out["sampled_queries"]
-    del pipeline_out
-    gc.collect()
     print(f"  Total chunks: {len(chunks)}")
     print(f"  Sampled queries: {len(sampled_queries)}")
     print(f"    single-entity: {sum(1 for q in sampled_queries if q['entity_group'] == 'single-entity')}")
     print(f"    multi-entity:  {sum(1 for q in sampled_queries if q['entity_group'] == 'multi-entity')}")
-
-    # === 2. Bi-Encoder Retrieval ===
-    print("\n=== 2. Bi-Encoder Retrieval ===")
-    run_biencoder_retrieval(chunks, sampled_queries, config, profiler)
-    print("  Bi-encoder retrieval complete.")
-
-    # === 3. ColBERTv2 Retrieval ===
-    print("\n=== 3. ColBERTv2 Retrieval ===")
-    run_colbert_retrieval(chunks, sampled_queries, config, profiler)
-    print("  ColBERTv2 retrieval complete.")
-
-    # === 4. Save JSON Log ===
-    print("\n=== 4. Saving JSON Log ===")
-    for q in sampled_queries:
-        record = {
-            "query": q["query"],
-            "entity_count": q["entity_count"],
-            "entity_list": q["entity_list"],
-            "entity_group": q["entity_group"],
-            "ground_truth_chunk_ids": q["ground_truth_chunk_ids"],
-        }
-        for key in ("biencoder_retrieved_ids", "biencoder_recall_at_k", "biencoder_latency_ms",
-                     "colbert_retrieved_ids", "colbert_recall_at_k", "colbert_latency_ms"):
-            if key in q:
-                record[key] = q[key]
-        profiler.log_query(record)
-
-    profiler.data["metadata"]["models"] = config["models"]
-    profiler.data["metadata"]["k_values"] = config["retrieval"]["k_values"]
-
-    log_path = config["paths"]["json_log"]
-    profiler.save(log_path)
     print(f"  JSON log saved to: {log_path}")
 
     # === 5. Evaluation ===
     print("\n=== 5. Evaluation ===")
-    summary = run_evaluation(log_path)
     print(summary.to_string(index=False))
 
-    # === 6. Visualization ===
     print("\n=== 6. Visualization ===")
-    output_paths = run_visualization(
-        log_path=log_path,
-        charts_dir=config["paths"]["charts_dir"],
-        csv_path=config["paths"]["csv_output"],
-    )
-    for name, path in output_paths.items():
+    for name, path in result["output_paths"].items():
         print(f"  {name}: {path}")
 
     # === 7. Profiling Summary ===
