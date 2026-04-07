@@ -11,6 +11,12 @@ chunking:
   sentence_window_stride: 2
   adaptive_min_words: 60
   adaptive_max_words: 120
+  semantic_model: "sentence-transformers/all-MiniLM-L6-v2"
+  semantic_similarity_threshold: 0.72
+  semantic_min_words: 60
+  semantic_max_words: 120
+  semantic_min_sentences: 2
+  semantic_max_sentences: 5
 
 queries:
   sample_size_per_group: 30

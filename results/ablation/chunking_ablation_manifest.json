@@ -11,7 +11,13 @@
         "sentence_window_size": 3,
         "sentence_window_stride": 2,
         "adaptive_min_words": 60,
-        "adaptive_max_words": 120
+        "adaptive_max_words": 120,
+        "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "semantic_similarity_threshold": 0.72,
+        "semantic_min_words": 60,
+        "semantic_max_words": 120,
+        "semantic_min_sentences": 2,
+        "semantic_max_sentences": 5
       },
       "queries": {
         "sample_size_per_group": 30,
@@ -71,7 +77,13 @@
         "sentence_window_size": 3,
         "sentence_window_stride": 2,
         "adaptive_min_words": 60,
-        "adaptive_max_words": 120
+        "adaptive_max_words": 120,
+        "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "semantic_similarity_threshold": 0.72,
+        "semantic_min_words": 60,
+        "semantic_max_words": 120,
+        "semantic_min_sentences": 2,
+        "semantic_max_sentences": 5
       },
       "queries": {
         "sample_size_per_group": 30,
@@ -131,7 +143,13 @@
         "sentence_window_size": 3,
         "sentence_window_stride": 2,
         "adaptive_min_words": 80,
-        "adaptive_max_words": 160
+        "adaptive_max_words": 160,
+        "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "semantic_similarity_threshold": 0.72,
+        "semantic_min_words": 60,
+        "semantic_max_words": 120,
+        "semantic_min_sentences": 2,
+        "semantic_max_sentences": 5
       },
       "queries": {
         "sample_size_per_group": 30,
@@ -177,6 +195,72 @@
       "latency_comparison": "results\\ablation\\adaptive_sentence\\charts\\latency_comparison.png",
       "index_size_comparison": "results\\ablation\\adaptive_sentence\\charts\\index_size_comparison.png",
       "summary_csv": "results\\ablation\\adaptive_sentence\\summary_statistics.csv"
+    }
+  },
+  "semantic_similarity": {
+    "config": {
+      "corpus": {
+        "target_size": 150,
+        "local_corpus_cache": "data\\corpus_cache_quick_semantic_similarity.parquet",
+        "seed": 42
+      },
+      "chunking": {
+        "strategy": "semantic_similarity",
+        "sentence_window_size": 3,
+        "sentence_window_stride": 2,
+        "adaptive_min_words": 60,
+        "adaptive_max_words": 120,
+        "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "semantic_similarity_threshold": 0.72,
+        "semantic_min_words": 60,
+        "semantic_max_words": 120,
+        "semantic_min_sentences": 2,
+        "semantic_max_sentences": 5
+      },
+      "queries": {
+        "sample_size_per_group": 30,
+        "seed": 42
+      },
+      "retrieval": {
+        "k_values": [
+          1,
+          5,
+          10,
+          20
+        ]
+      },
+      "models": {
+        "biencoder": "sentence-transformers/all-MiniLM-L6-v2",
+        "colbert": "colbert-ir/colbertv2.0"
+      },
+      "colbert": {
+        "bsize": 8
+      },
+      "paths": {
+        "results_dir": "results\\ablation\\semantic_similarity",
+        "faiss_index_dir": "results\\ablation\\semantic_similarity\\faiss_index",
+        "colbert_index_dir": "results\\ablation\\semantic_similarity\\colbert_index",
+        "json_log": "results\\ablation\\semantic_similarity\\benchmark_log.json",
+        "charts_dir": "results\\ablation\\semantic_similarity\\charts",
+        "csv_output": "results\\ablation\\semantic_similarity\\summary_statistics.csv"
+      },
+      "spacy": {
+        "model": "en_core_web_sm",
+        "entity_threshold": 2
+      }
+    },
+    "log_path": "results\\ablation\\semantic_similarity\\benchmark_log.json",
+    "charts": {
+      "recall_bar_chart": "results\\ablation\\semantic_similarity\\charts\\recall_bar_chart.png",
+      "recall_histograms": [
+        "results\\ablation\\semantic_similarity\\charts\\recall_histogram_k1.png",
+        "results\\ablation\\semantic_similarity\\charts\\recall_histogram_k5.png",
+        "results\\ablation\\semantic_similarity\\charts\\recall_histogram_k10.png",
+        "results\\ablation\\semantic_similarity\\charts\\recall_histogram_k20.png"
+      ],
+      "latency_comparison": "results\\ablation\\semantic_similarity\\charts\\latency_comparison.png",
+      "index_size_comparison": "results\\ablation\\semantic_similarity\\charts\\index_size_comparison.png",
+      "summary_csv": "results\\ablation\\semantic_similarity\\summary_statistics.csv"
     }
   }
 }

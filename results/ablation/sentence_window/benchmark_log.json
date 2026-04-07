@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "timestamp": "2026-04-07T00:54:06.222376+00:00",
+    "timestamp": "2026-04-07T03:45:18.550976+00:00",
     "config": {
       "corpus": {
         "target_size": 150,
@@ -12,7 +12,13 @@
         "sentence_window_size": 3,
         "sentence_window_stride": 2,
         "adaptive_min_words": 60,
-        "adaptive_max_words": 120
+        "adaptive_max_words": 120,
+        "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "semantic_similarity_threshold": 0.72,
+        "semantic_min_words": 60,
+        "semantic_max_words": 120,
+        "semantic_min_sentences": 2,
+        "semantic_max_sentences": 5
       },
       "queries": {
         "sample_size_per_group": 30,
@@ -56,7 +62,13 @@
       "sentence_window_size": 3,
       "sentence_window_stride": 2,
       "adaptive_min_words": 60,
-      "adaptive_max_words": 120
+      "adaptive_max_words": 120,
+      "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+      "semantic_similarity_threshold": 0.72,
+      "semantic_min_words": 60,
+      "semantic_max_words": 120,
+      "semantic_min_sentences": 2,
+      "semantic_max_sentences": 5
     },
     "queries_per_group": {
       "multi-entity": 21,
@@ -76,54 +88,54 @@
   },
   "stages": {
     "data_loading": {
-      "duration_seconds": 1.8737,
+      "duration_seconds": 1.6613,
       "peak_vram_bytes": 8519680,
-      "rss_bytes": 1527967744
+      "rss_bytes": 1528852480
     },
     "ner_classification": {
-      "duration_seconds": 1.5499,
+      "duration_seconds": 1.3935,
       "peak_vram_bytes": 8519680,
-      "rss_bytes": 1554247680
+      "rss_bytes": 1554780160
     },
     "query_sampling": {
       "duration_seconds": 0.0001,
       "peak_vram_bytes": 8519680,
-      "rss_bytes": 1554251776
+      "rss_bytes": 1554800640
     },
     "corpus_construction": {
-      "duration_seconds": 0.0223,
+      "duration_seconds": 0.0157,
       "peak_vram_bytes": 8519680,
-      "rss_bytes": 1557770240
+      "rss_bytes": 1542250496
     },
     "chunking": {
-      "duration_seconds": 0.1847,
+      "duration_seconds": 0.1778,
       "peak_vram_bytes": 8519680,
-      "rss_bytes": 1558454272
+      "rss_bytes": 1543311360
     },
     "biencoder_encoding": {
-      "duration_seconds": 2.557,
+      "duration_seconds": 2.5754,
       "peak_vram_bytes": 1276014080,
-      "rss_bytes": 1523740672
+      "rss_bytes": 1550438400
     },
     "faiss_indexing": {
-      "duration_seconds": 0.1629,
+      "duration_seconds": 0.1583,
       "peak_vram_bytes": 100036096,
-      "rss_bytes": 1530634240
+      "rss_bytes": 1523941376
     },
     "biencoder_retrieval": {
-      "duration_seconds": 0.3294,
+      "duration_seconds": 0.3228,
       "peak_vram_bytes": 101307392,
-      "rss_bytes": 1526341632
+      "rss_bytes": 1519800320
     },
     "colbert_indexing": {
-      "duration_seconds": 1015.5748,
+      "duration_seconds": 1062.2076,
       "peak_vram_bytes": 23559412224,
-      "rss_bytes": 1920094208
+      "rss_bytes": 1832853504
     },
     "colbert_retrieval": {
-      "duration_seconds": 3.3172,
+      "duration_seconds": 3.2798,
       "peak_vram_bytes": 1096564224,
-      "rss_bytes": 1762648064
+      "rss_bytes": 1628303360
     }
   },
   "queries": [
@@ -165,7 +177,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 7.0975,
+      "biencoder_latency_ms": 8.5836,
       "colbert_retrieved_ids": [
         "22141582_1_c0",
         "22141582_3_c0",
@@ -194,7 +206,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 1827.5839
+      "colbert_latency_ms": 1964.4368
     },
     {
       "query": "who scored the most points in a single game in the nba",
@@ -232,7 +244,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.7839,
+      "biencoder_latency_ms": 7.461,
       "colbert_retrieved_ids": [
         "3177042_23_c3",
         "3177042_23_c2",
@@ -261,7 +273,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 35.7101
+      "colbert_latency_ms": 33.6315
     },
     {
       "query": "how many plane surfaces does a cylinder have",
@@ -269,9 +281,9 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "859283_7",
+        "859283_16",
         "859283_0",
-        "859283_16"
+        "859283_7"
       ],
       "biencoder_retrieved_ids": [
         "47106911_11_c0",
@@ -301,7 +313,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.2341,
+      "biencoder_latency_ms": 6.1539,
       "colbert_retrieved_ids": [
         "47300_9_c1",
         "47300_9_c2",
@@ -330,7 +342,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 30.198
+      "colbert_latency_ms": 29.2301
     },
     {
       "query": "who did michael showers play on vampire diaries",
@@ -340,8 +352,8 @@
       ],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "32031867_6",
-        "25517474_3"
+        "25517474_3",
+        "32031867_6"
       ],
       "biencoder_retrieved_ids": [
         "1102458_57_c2",
@@ -371,7 +383,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 5.8556,
+      "biencoder_latency_ms": 5.6038,
       "colbert_retrieved_ids": [
         "1102458_56_c0",
         "1102458_10_c1",
@@ -400,7 +412,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 26.3899
+      "colbert_latency_ms": 31.3986
     },
     {
       "query": "who has majority in the house and senate",
@@ -410,8 +422,8 @@
       ],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "12844936_1",
-        "12844936_0"
+        "12844936_0",
+        "12844936_1"
       ],
       "biencoder_retrieved_ids": [
         "30622317_27_c0",
@@ -441,7 +453,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.1001,
+      "biencoder_latency_ms": 5.6662,
       "colbert_retrieved_ids": [
         "30659757_1_c0",
         "691_73_c0",
@@ -470,7 +482,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 26.6667
+      "colbert_latency_ms": 29.4172
     },
     {
       "query": "who plays in the new mary poppins movie",
@@ -509,7 +521,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 5.8322,
+      "biencoder_latency_ms": 5.7413,
       "colbert_retrieved_ids": [
         "1102458_55_c0",
         "12989608_6_c0",
@@ -538,7 +550,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 26.7983
+      "colbert_latency_ms": 28.2752
     },
     {
       "query": "who sings ive loved you for a thousand years",
@@ -548,9 +560,9 @@
       ],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "33545013_1",
-        "33545013_0",
         "33545013_6",
+        "33545013_0",
+        "33545013_1",
         "38980545_3",
         "33545013_18"
       ],
@@ -582,7 +594,7 @@
         "10": 0.6,
         "20": 0.6
       },
-      "biencoder_latency_ms": 6.2515,
+      "biencoder_latency_ms": 6.0329,
       "colbert_retrieved_ids": [
         "33545013_1_c0",
         "33545013_0_c0",
@@ -611,7 +623,7 @@
         "10": 0.8,
         "20": 0.8
       },
-      "colbert_latency_ms": 27.627
+      "colbert_latency_ms": 28.6666
     },
     {
       "query": "who has the most gold gloves at shortstop",
@@ -619,8 +631,8 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "23318451_1",
         "23318451_2",
+        "23318451_1",
         "301428_5"
       ],
       "biencoder_retrieved_ids": [
@@ -651,7 +663,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 5.9649,
+      "biencoder_latency_ms": 6.6258,
       "colbert_retrieved_ids": [
         "630789_3_c0",
         "6184889_2_c0",
@@ -680,7 +692,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 27.0326
+      "colbert_latency_ms": 25.2505
     },
     {
       "query": "when was the movie cool hand luke made",
@@ -689,8 +701,8 @@
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
         "161897_0",
-        "8134096_4",
-        "161897_1"
+        "161897_1",
+        "8134096_4"
       ],
       "biencoder_retrieved_ids": [
         "161897_1_c0",
@@ -720,7 +732,7 @@
         "10": 0.6666666666666666,
         "20": 1.0
       },
-      "biencoder_latency_ms": 5.8574,
+      "biencoder_latency_ms": 5.8885,
       "colbert_retrieved_ids": [
         "161897_62_c0",
         "161897_1_c0",
@@ -749,7 +761,7 @@
         "10": 0.6666666666666666,
         "20": 1.0
       },
-      "colbert_latency_ms": 27.0299
+      "colbert_latency_ms": 32.421
     },
     {
       "query": "who proposed evolution in 1859 as the basis of biological development",
@@ -760,8 +772,8 @@
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
         "21501970_2",
-        "8787159_1",
-        "1494_1"
+        "1494_1",
+        "8787159_1"
       ],
       "biencoder_retrieved_ids": [
         "1494_70_c0",
@@ -791,7 +803,7 @@
         "10": 0.0,
         "20": 0.3333333333333333
       },
-      "biencoder_latency_ms": 5.8933,
+      "biencoder_latency_ms": 5.756,
       "colbert_retrieved_ids": [
         "1494_1_c0",
         "1494_52_c0",
@@ -820,7 +832,7 @@
         "10": 0.3333333333333333,
         "20": 0.3333333333333333
       },
-      "colbert_latency_ms": 27.424
+      "colbert_latency_ms": 27.8396
     },
     {
       "query": "the art and science of making objects from clay is called",
@@ -828,10 +840,10 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "29560452_15",
         "53597975_1",
-        "47106911_1",
-        "47106911_0"
+        "47106911_0",
+        "29560452_15",
+        "47106911_1"
       ],
       "biencoder_retrieved_ids": [
         "47106911_6_c0",
@@ -861,7 +873,7 @@
         "10": 0.25,
         "20": 0.25
       },
-      "biencoder_latency_ms": 6.3252,
+      "biencoder_latency_ms": 7.4776,
       "colbert_retrieved_ids": [
         "47106911_2_c1",
         "47106911_2_c0",
@@ -890,7 +902,7 @@
         "10": 0.25,
         "20": 0.25
       },
-      "colbert_latency_ms": 25.7804
+      "colbert_latency_ms": 26.3401
     },
     {
       "query": "where does the red river start and end in louisiana",
@@ -932,7 +944,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.2048,
+      "biencoder_latency_ms": 7.2946,
       "colbert_retrieved_ids": [
         "2066382_4_c1",
         "20013780_59_c1",
@@ -961,7 +973,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 28.5851
+      "colbert_latency_ms": 28.6688
     },
     {
       "query": "a good that can be used in place of another good",
@@ -969,9 +981,9 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "421981_1",
         "421981_0",
-        "421981_11"
+        "421981_11",
+        "421981_1"
       ],
       "biencoder_retrieved_ids": [
         "421981_0_c0",
@@ -1001,7 +1013,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 6.3112,
+      "biencoder_latency_ms": 9.5062,
       "colbert_retrieved_ids": [
         "421981_1_c0",
         "421981_11_c0",
@@ -1030,7 +1042,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 25.394
+      "colbert_latency_ms": 27.7
     },
     {
       "query": "who sings the wire season 5 theme song",
@@ -1072,7 +1084,7 @@
         "10": 0.3333333333333333,
         "20": 0.3333333333333333
       },
-      "biencoder_latency_ms": 5.8701,
+      "biencoder_latency_ms": 10.2001,
       "colbert_retrieved_ids": [
         "6874862_2_c0",
         "1102458_124_c0",
@@ -1101,7 +1113,7 @@
         "10": 0.6666666666666666,
         "20": 0.6666666666666666
       },
-      "colbert_latency_ms": 24.3683
+      "colbert_latency_ms": 35.3576
     },
     {
       "query": "who played the nurse on andy griffith show",
@@ -1142,7 +1154,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.2135,
+      "biencoder_latency_ms": 6.0711,
       "colbert_retrieved_ids": [
         "1102458_57_c2",
         "161897_44_c1",
@@ -1171,7 +1183,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 24.3451
+      "colbert_latency_ms": 23.8005
     },
     {
       "query": "where's the pro bowl going to be this year",
@@ -1181,9 +1193,9 @@
       ],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
+        "52757315_4",
         "52757315_1",
-        "52757315_0",
-        "52757315_4"
+        "52757315_0"
       ],
       "biencoder_retrieved_ids": [
         "52757315_0_c0",
@@ -1213,7 +1225,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 6.0141,
+      "biencoder_latency_ms": 5.6998,
       "colbert_retrieved_ids": [
         "52757315_1_c0",
         "52757315_4_c0",
@@ -1242,7 +1254,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 26.3511
+      "colbert_latency_ms": 25.752
     },
     {
       "query": "where are the washington redskins based out of",
@@ -1283,7 +1295,7 @@
         "10": 0.5,
         "20": 0.5
       },
-      "biencoder_latency_ms": 5.7669,
+      "biencoder_latency_ms": 5.8953,
       "colbert_retrieved_ids": [
         "48447315_1_c0",
         "48447315_2_c0",
@@ -1312,7 +1324,7 @@
         "10": 0.5,
         "20": 0.5
       },
-      "colbert_latency_ms": 26.917
+      "colbert_latency_ms": 22.6332
     },
     {
       "query": "when was clash royale released in the us",
@@ -1353,7 +1365,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.1363,
+      "biencoder_latency_ms": 5.7013,
       "colbert_retrieved_ids": [
         "33545013_19_c0",
         "33545013_18_c0",
@@ -1382,7 +1394,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 114.1291
+      "colbert_latency_ms": 24.3908
     },
     {
       "query": "where did the crown of thorns starfish come from",
@@ -1390,9 +1402,9 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "607457_2",
+        "607457_0",
         "607457_73",
-        "607457_0"
+        "607457_2"
       ],
       "biencoder_retrieved_ids": [
         "8872619_10_c0",
@@ -1422,7 +1434,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.4506,
+      "biencoder_latency_ms": 6.0034,
       "colbert_retrieved_ids": [
         "26740_42_c0",
         "226808_14_c0",
@@ -1451,7 +1463,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 32.7111
+      "colbert_latency_ms": 23.2455
     },
     {
       "query": "who does the voice of cruz on cars 3",
@@ -1461,9 +1473,9 @@
       ],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "41498488_1",
         "41498488_0",
-        "41498488_47"
+        "41498488_47",
+        "41498488_1"
       ],
       "biencoder_retrieved_ids": [
         "38331059_6_c2",
@@ -1493,7 +1505,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.3366,
+      "biencoder_latency_ms": 5.9574,
       "colbert_retrieved_ids": [
         "1102458_55_c0",
         "38331059_11_c0",
@@ -1522,7 +1534,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 25.7453
+      "colbert_latency_ms": 32.2059
     },
     {
       "query": "who are the judges on do you think you can dance",
@@ -1530,10 +1542,10 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
+        "38020871_64",
         "38020871_0",
-        "26401606_3",
         "38020871_21",
-        "38020871_64"
+        "26401606_3"
       ],
       "biencoder_retrieved_ids": [
         "9704619_61_c0",
@@ -1563,7 +1575,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.3636,
+      "biencoder_latency_ms": 5.9309,
       "colbert_retrieved_ids": [
         "9704619_61_c0",
         "9704619_62_c0",
@@ -1592,7 +1604,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 26.0768
+      "colbert_latency_ms": 23.9525
     },
     {
       "query": "what part of brain is responsible for complex thinking",
@@ -1600,9 +1612,9 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
+        "469220_1",
         "21312312_4",
         "469220_0",
-        "469220_1",
         "27023036_1"
       ],
       "biencoder_retrieved_ids": [
@@ -1633,7 +1645,7 @@
         "10": 0.25,
         "20": 0.25
       },
-      "biencoder_latency_ms": 6.0154,
+      "biencoder_latency_ms": 6.2348,
       "colbert_retrieved_ids": [
         "27023036_2_c0",
         "27023036_1_c0",
@@ -1662,7 +1674,7 @@
         "10": 0.25,
         "20": 0.25
       },
-      "colbert_latency_ms": 28.6283
+      "colbert_latency_ms": 24.4561
     },
     {
       "query": "when did the song holiday road come out",
@@ -1700,7 +1712,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.3059,
+      "biencoder_latency_ms": 5.8205,
       "colbert_retrieved_ids": [
         "361971_18_c0",
         "361971_14_c0",
@@ -1729,7 +1741,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 32.069
+      "colbert_latency_ms": 22.6509
     },
     {
       "query": "when is the new series of keeping faith starting",
@@ -1768,7 +1780,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.0591,
+      "biencoder_latency_ms": 5.6548,
       "colbert_retrieved_ids": [
         "1102458_132_c0",
         "1102458_127_c1",
@@ -1797,7 +1809,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 26.7972
+      "colbert_latency_ms": 23.5678
     },
     {
       "query": "when did gimme gimme gimme start",
@@ -1805,8 +1817,8 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "1019647_32",
-        "1019647_1"
+        "1019647_1",
+        "1019647_32"
       ],
       "biencoder_retrieved_ids": [
         "55476511_0_c0",
@@ -1836,7 +1848,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.1981,
+      "biencoder_latency_ms": 5.8936,
       "colbert_retrieved_ids": [
         "20274555_4_c1",
         "33545013_18_c0",
@@ -1865,7 +1877,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 29.0582
+      "colbert_latency_ms": 23.5506
     },
     {
       "query": "when was the first commercial cell phone released",
@@ -1875,13 +1887,13 @@
       ],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "1245539_36",
-        "1245539_44",
-        "19644137_2",
-        "2705671_1",
-        "1245539_38",
         "1245539_51",
-        "1245539_0"
+        "19644137_2",
+        "1245539_36",
+        "1245539_0",
+        "1245539_38",
+        "2705671_1",
+        "1245539_44"
       ],
       "biencoder_retrieved_ids": [
         "1245539_44_c0",
@@ -1911,7 +1923,7 @@
         "10": 0.2857142857142857,
         "20": 0.5714285714285714
       },
-      "biencoder_latency_ms": 6.14,
+      "biencoder_latency_ms": 5.5479,
       "colbert_retrieved_ids": [
         "1245539_42_c0",
         "1245539_32_c0",
@@ -1940,7 +1952,7 @@
         "10": 0.2857142857142857,
         "20": 0.42857142857142855
       },
-      "colbert_latency_ms": 29.9017
+      "colbert_latency_ms": 25.4479
     },
     {
       "query": "who sang oh annie i not your daddy",
@@ -1978,7 +1990,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.4174,
+      "biencoder_latency_ms": 5.6003,
       "colbert_retrieved_ids": [
         "361971_18_c0",
         "20274555_10_c2",
@@ -2007,7 +2019,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 27.9824
+      "colbert_latency_ms": 25.2798
     },
     {
       "query": "who sang the song should have been a cowboy",
@@ -2046,7 +2058,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.7395,
+      "biencoder_latency_ms": 5.9405,
       "colbert_retrieved_ids": [
         "8134096_6_c0",
         "6874862_1_c0",
@@ -2075,7 +2087,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 33.4678
+      "colbert_latency_ms": 24.8835
     },
     {
       "query": "where does the coral sea meet the pacific ocean",
@@ -2086,8 +2098,8 @@
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
         "309666_1",
-        "23070_24",
-        "309666_0"
+        "309666_0",
+        "23070_24"
       ],
       "biencoder_retrieved_ids": [
         "23070_24_c0",
@@ -2117,7 +2129,7 @@
         "10": 0.3333333333333333,
         "20": 0.3333333333333333
       },
-      "biencoder_latency_ms": 6.0528,
+      "biencoder_latency_ms": 5.6825,
       "colbert_retrieved_ids": [
         "23070_24_c0",
         "23070_61_c0",
@@ -2146,7 +2158,7 @@
         "10": 0.3333333333333333,
         "20": 0.3333333333333333
       },
-      "colbert_latency_ms": 26.1235
+      "colbert_latency_ms": 29.6766
     },
     {
       "query": "who had the most governmental power under the articles of confederation",
@@ -2154,8 +2166,8 @@
       "entity_list": [],
       "entity_group": "single-entity",
       "ground_truth_chunk_ids": [
-        "691_0",
-        "691_16"
+        "691_16",
+        "691_0"
       ],
       "biencoder_retrieved_ids": [
         "691_0_c0",
@@ -2185,7 +2197,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 6.2637,
+      "biencoder_latency_ms": 5.8965,
       "colbert_retrieved_ids": [
         "691_49_c0",
         "691_66_c0",
@@ -2214,7 +2226,7 @@
         "10": 0.5,
         "20": 0.5
       },
-      "colbert_latency_ms": 26.7557
+      "colbert_latency_ms": 25.261
     },
     {
       "query": "when was the day that the pubs ran dry in the poem 9-3",
@@ -2255,7 +2267,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.8385,
+      "biencoder_latency_ms": 6.5328,
       "colbert_retrieved_ids": [
         "20274555_4_c1",
         "3550050_28_c0",
@@ -2284,7 +2296,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 26.5004
+      "colbert_latency_ms": 23.0198
     },
     {
       "query": "mainland greece is a body of land with water on three sides called",
@@ -2295,8 +2307,8 @@
       ],
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
-        "22734452_2",
         "22734452_3",
+        "22734452_2",
         "22734452_20"
       ],
       "biencoder_retrieved_ids": [
@@ -2327,7 +2339,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.1958,
+      "biencoder_latency_ms": 6.5213,
       "colbert_retrieved_ids": [
         "47106911_76_c0",
         "23070_57_c1",
@@ -2356,7 +2368,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 31.8154
+      "colbert_latency_ms": 26.4691
     },
     {
       "query": "when was the 50th star added to the united states flag",
@@ -2397,7 +2409,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 6.2666,
+      "biencoder_latency_ms": 6.1945,
       "colbert_retrieved_ids": [
         "8872619_8_c0",
         "8872619_37_c0",
@@ -2426,7 +2438,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 29.7107
+      "colbert_latency_ms": 30.0141
     },
     {
       "query": "who won the men's single title of australia open on 1 february 2015",
@@ -2467,7 +2479,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.817,
+      "biencoder_latency_ms": 5.9722,
       "colbert_retrieved_ids": [
         "630789_5_c0",
         "53849670_3_c0",
@@ -2496,7 +2508,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 25.7793
+      "colbert_latency_ms": 24.6249
     },
     {
       "query": "which abbott and costello movie has who on first",
@@ -2507,8 +2519,8 @@
       ],
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
-        "105969_11",
-        "106089_6"
+        "106089_6",
+        "105969_11"
       ],
       "biencoder_retrieved_ids": [
         "8134096_40_c0",
@@ -2538,7 +2550,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.3478,
+      "biencoder_latency_ms": 6.5123,
       "colbert_retrieved_ids": [
         "8134096_40_c0",
         "12989608_2_c0",
@@ -2567,7 +2579,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 38.4092
+      "colbert_latency_ms": 24.1827
     },
     {
       "query": "when did the ouija board first come out",
@@ -2608,7 +2620,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 5.9211,
+      "biencoder_latency_ms": 5.8598,
       "colbert_retrieved_ids": [
         "20274555_4_c1",
         "12989608_6_c0",
@@ -2637,7 +2649,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 33.0683
+      "colbert_latency_ms": 26.0651
     },
     {
       "query": "who was the first english child born in north america",
@@ -2650,8 +2662,8 @@
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
         "74546_28",
-        "152308_0",
-        "74546_12"
+        "74546_12",
+        "152308_0"
       ],
       "biencoder_retrieved_ids": [
         "1494_11_c1",
@@ -2681,7 +2693,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 5.9778,
+      "biencoder_latency_ms": 5.8878,
       "colbert_retrieved_ids": [
         "226808_101_c0",
         "1494_8_c0",
@@ -2710,7 +2722,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 25.8258
+      "colbert_latency_ms": 30.381
     },
     {
       "query": "when did toyota first come to the united states",
@@ -2723,8 +2735,8 @@
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
         "30984_55",
-        "30984_0",
-        "1303184_11"
+        "1303184_11",
+        "30984_0"
       ],
       "biencoder_retrieved_ids": [
         "38331059_1_c1",
@@ -2754,7 +2766,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.0943,
+      "biencoder_latency_ms": 6.2476,
       "colbert_retrieved_ids": [
         "1245539_8_c0",
         "1245539_50_c0",
@@ -2783,7 +2795,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 28.068
+      "colbert_latency_ms": 24.6561
     },
     {
       "query": "who won french open 2017 tennis tournament in men's double category",
@@ -2794,9 +2806,9 @@
       ],
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
+        "51884451_132",
         "51884451_0",
-        "53849670_2",
-        "51884451_132"
+        "53849670_2"
       ],
       "biencoder_retrieved_ids": [
         "53849670_0_c0",
@@ -2826,7 +2838,7 @@
         "10": 0.3333333333333333,
         "20": 0.3333333333333333
       },
-      "biencoder_latency_ms": 6.3256,
+      "biencoder_latency_ms": 6.373,
       "colbert_retrieved_ids": [
         "53849670_0_c0",
         "630789_5_c2",
@@ -2855,7 +2867,7 @@
         "10": 0.3333333333333333,
         "20": 0.3333333333333333
       },
-      "colbert_latency_ms": 34.5455
+      "colbert_latency_ms": 24.8633
     },
     {
       "query": "who proclaimed 5th october as world’s teachers day",
@@ -2866,8 +2878,8 @@
       ],
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
-        "2822215_0",
-        "2822215_1"
+        "2822215_1",
+        "2822215_0"
       ],
       "biencoder_retrieved_ids": [
         "2822215_1_c0",
@@ -2897,7 +2909,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 6.0095,
+      "biencoder_latency_ms": 6.2672,
       "colbert_retrieved_ids": [
         "2822215_1_c0",
         "2822215_5_c0",
@@ -2926,7 +2938,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 26.6279
+      "colbert_latency_ms": 24.9783
     },
     {
       "query": "star cast of ab tumhare hawale watan sathiyon",
@@ -2967,7 +2979,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 6.2715,
+      "biencoder_latency_ms": 6.1786,
       "colbert_retrieved_ids": [
         "8166078_1_c0",
         "8166078_0_c0",
@@ -2996,7 +3008,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 26.0472
+      "colbert_latency_ms": 23.583
     },
     {
       "query": "is greenland part of europe or north america",
@@ -3038,7 +3050,7 @@
         "10": 0.5,
         "20": 0.5
       },
-      "biencoder_latency_ms": 6.0926,
+      "biencoder_latency_ms": 5.5336,
       "colbert_retrieved_ids": [
         "26740_2_c0",
         "26740_1_c0",
@@ -3067,7 +3079,7 @@
         "10": 0.5,
         "20": 0.5
       },
-      "colbert_latency_ms": 26.7914
+      "colbert_latency_ms": 23.3482
     },
     {
       "query": "an influential religion to enter china along the silk route during the han dynasty was",
@@ -3078,13 +3090,13 @@
       ],
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
-        "1471955_44",
-        "226808_5",
-        "1471955_48",
-        "226808_21",
         "226808_6",
+        "1471955_48",
+        "1471955_44",
+        "226808_21",
+        "9704619_1",
         "226808_0",
-        "9704619_1"
+        "226808_5"
       ],
       "biencoder_retrieved_ids": [
         "1471955_9_c0",
@@ -3114,7 +3126,7 @@
         "10": 0.2857142857142857,
         "20": 0.5714285714285714
       },
-      "biencoder_latency_ms": 6.3885,
+      "biencoder_latency_ms": 6.1003,
       "colbert_retrieved_ids": [
         "1471955_9_c0",
         "1471955_1_c0",
@@ -3143,7 +3155,7 @@
         "10": 0.2857142857142857,
         "20": 0.42857142857142855
       },
-      "colbert_latency_ms": 35.2087
+      "colbert_latency_ms": 22.7146
     },
     {
       "query": "who won the fifth season of america's got talent",
@@ -3184,7 +3196,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.0538,
+      "biencoder_latency_ms": 5.8402,
       "colbert_retrieved_ids": [
         "1102458_118_c0",
         "1102458_117_c0",
@@ -3213,7 +3225,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 26.8665
+      "colbert_latency_ms": 25.2938
     },
     {
       "query": "where are the spanish steps located in italy",
@@ -3256,7 +3268,7 @@
         "10": 0.6666666666666666,
         "20": 0.6666666666666666
       },
-      "biencoder_latency_ms": 7.1342,
+      "biencoder_latency_ms": 5.5466,
       "colbert_retrieved_ids": [
         "361971_1_c0",
         "3116739_1_c0",
@@ -3285,7 +3297,7 @@
         "10": 0.6666666666666666,
         "20": 0.6666666666666666
       },
-      "colbert_latency_ms": 24.4261
+      "colbert_latency_ms": 22.2874
     },
     {
       "query": "state the process that divides one nucleus into two genetically identical nuclei",
@@ -3296,9 +3308,9 @@
       ],
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
+        "20369_2",
         "20369_0",
-        "20369_1",
-        "20369_2"
+        "20369_1"
       ],
       "biencoder_retrieved_ids": [
         "20369_30_c3",
@@ -3328,7 +3340,7 @@
         "10": 0.6666666666666666,
         "20": 0.6666666666666666
       },
-      "biencoder_latency_ms": 10.171,
+      "biencoder_latency_ms": 6.6115,
       "colbert_retrieved_ids": [
         "20369_1_c0",
         "20369_1_c1",
@@ -3357,7 +3369,7 @@
         "10": 0.6666666666666666,
         "20": 0.6666666666666666
       },
-      "colbert_latency_ms": 24.2915
+      "colbert_latency_ms": 29.1726
     },
     {
       "query": "where was the louisiana purchase signed in 1803",
@@ -3369,8 +3381,8 @@
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
         "17628_40",
-        "191926_1",
-        "17628_19"
+        "17628_19",
+        "191926_1"
       ],
       "biencoder_retrieved_ids": [
         "691_72_c0",
@@ -3400,7 +3412,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 8.1692,
+      "biencoder_latency_ms": 6.031,
       "colbert_retrieved_ids": [
         "8872619_8_c1",
         "8872619_8_c0",
@@ -3429,7 +3441,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 24.2548
+      "colbert_latency_ms": 26.6322
     },
     {
       "query": "who invented the first computer game in 1962 and what was the name of the game",
@@ -3441,8 +3453,8 @@
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
         "5482854_0",
-        "5482854_1",
-        "5482854_22"
+        "5482854_22",
+        "5482854_1"
       ],
       "biencoder_retrieved_ids": [
         "47106911_26_c0",
@@ -3472,7 +3484,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 6.4736,
+      "biencoder_latency_ms": 6.3716,
       "colbert_retrieved_ids": [
         "47300_46_c0",
         "1245539_9_c0",
@@ -3501,7 +3513,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 23.6878
+      "colbert_latency_ms": 24.604
     },
     {
       "query": "when did the prr first begin its passenger service between pittsburgh and philadelphia",
@@ -3514,8 +3526,8 @@
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
         "91934_1",
-        "320965_0",
-        "320965_11"
+        "320965_11",
+        "320965_0"
       ],
       "biencoder_retrieved_ids": [
         "59840480_10_c0",
@@ -3545,7 +3557,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "biencoder_latency_ms": 7.135,
+      "biencoder_latency_ms": 6.2916,
       "colbert_retrieved_ids": [
         "1245539_25_c0",
         "1245539_5_c2",
@@ -3574,7 +3586,7 @@
         "10": 0.0,
         "20": 0.0
       },
-      "colbert_latency_ms": 31.2054
+      "colbert_latency_ms": 24.0404
     },
     {
       "query": "who is often associated with printing the first book using moveable type in germany",
@@ -3585,9 +3597,9 @@
       ],
       "entity_group": "multi-entity",
       "ground_truth_chunk_ids": [
-        "286327_1",
+        "47300_4",
         "47300_46",
-        "47300_4"
+        "286327_1"
       ],
       "biencoder_retrieved_ids": [
         "286327_11_c0",
@@ -3617,7 +3629,7 @@
         "10": 0.0,
         "20": 0.6666666666666666
       },
-      "biencoder_latency_ms": 7.5449,
+      "biencoder_latency_ms": 5.8119,
       "colbert_retrieved_ids": [
         "47300_46_c0",
         "47300_2_c0",
@@ -3646,7 +3658,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 24.6884
+      "colbert_latency_ms": 23.739
     },
     {
       "query": "who won game 4 of the 2000 nba finals",
@@ -3688,7 +3700,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "biencoder_latency_ms": 6.9547,
+      "biencoder_latency_ms": 6.4993,
       "colbert_retrieved_ids": [
         "3177042_1_c0",
         "3177042_22_c0",
@@ -3717,7 +3729,7 @@
         "10": 1.0,
         "20": 1.0
       },
-      "colbert_latency_ms": 23.6908
+      "colbert_latency_ms": 23.8584
     }
   ],
   "disk_sizes": {

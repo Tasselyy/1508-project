@@ -12,11 +12,13 @@ import pandas as pd
 import requests
 import spacy
 from datasets import load_dataset
+from sentence_transformers import SentenceTransformer
 
 from src.profiler import Profiler
 
 KILT_WIKIPEDIA_URL = "http://dl.fbaipublicfiles.com/KILT/kilt_knowledgesource.json"
 _SENTENCE_SPLITTER = re.compile(r"(?<=[.!?])\s+")
+_SENTENCE_ENCODER_CACHE: dict[str, SentenceTransformer] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +207,13 @@ def _split_sentences(text: str) -> list[str]:
     return sentences or [text.strip()]
 
 
+def _get_sentence_encoder(model_name: str) -> SentenceTransformer:
+    """Load and cache the sentence embedding model used for semantic chunking."""
+    if model_name not in _SENTENCE_ENCODER_CACHE:
+        _SENTENCE_ENCODER_CACHE[model_name] = SentenceTransformer(model_name)
+    return _SENTENCE_ENCODER_CACHE[model_name]
+
+
 def _sentence_window_chunks(
     paragraph_text: str,
     window_size: int,
@@ -257,6 +266,73 @@ def _adaptive_sentence_chunks(
     return [chunk for chunk in chunks if chunk]
 
 
+def _semantic_similarity_chunks(
+    paragraph_text: str,
+    model_name: str,
+    similarity_threshold: float,
+    min_words: int,
+    max_words: int,
+    min_sentences: int,
+    max_sentences: int,
+) -> list[str]:
+    """Split a paragraph when a new sentence diverges semantically from the current chunk.
+
+    The decision boundary follows the proposal idea: if the cosine similarity
+    between the next sentence embedding and the current chunk centroid drops
+    below a threshold, we start a new chunk, subject to size constraints.
+    """
+    sentences = _split_sentences(paragraph_text)
+    if len(sentences) <= 1:
+        return [" ".join(sentences).strip()]
+
+    encoder = _get_sentence_encoder(model_name)
+    embeddings = np.asarray(
+        encoder.encode(sentences, normalize_embeddings=True, show_progress_bar=False),
+        dtype=np.float32,
+    )
+
+    chunks: list[str] = []
+    current_sentences: list[str] = []
+    current_embeddings: list[np.ndarray] = []
+    current_words = 0
+
+    for sentence, embedding in zip(sentences, embeddings, strict=False):
+        sentence_words = len(sentence.split())
+
+        should_split_for_size = (
+            current_sentences
+            and (
+                len(current_sentences) >= max_sentences
+                or current_words + sentence_words > max_words
+            )
+        )
+
+        should_split_for_semantics = False
+        if current_sentences:
+            centroid = np.mean(np.stack(current_embeddings, axis=0), axis=0)
+            centroid_norm = np.linalg.norm(centroid)
+            if centroid_norm > 0:
+                centroid = centroid / centroid_norm
+            similarity = float(np.dot(embedding, centroid))
+            enough_context = current_words >= min_words or len(current_sentences) >= min_sentences
+            should_split_for_semantics = enough_context and similarity < similarity_threshold
+
+        if should_split_for_size or should_split_for_semantics:
+            chunks.append(" ".join(current_sentences).strip())
+            current_sentences = []
+            current_embeddings = []
+            current_words = 0
+
+        current_sentences.append(sentence)
+        current_embeddings.append(embedding)
+        current_words += sentence_words
+
+    if current_sentences:
+        chunks.append(" ".join(current_sentences).strip())
+
+    return [chunk for chunk in chunks if chunk]
+
+
 def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -> list[dict]:
     """Chunk Wikipedia pages into retrieval units with source metadata.
 
@@ -268,6 +344,12 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
     sentence_window_stride = max(1, int(chunking_config.get("sentence_window_stride", 2)))
     adaptive_min_words = max(1, int(chunking_config.get("adaptive_min_words", 80)))
     adaptive_max_words = max(adaptive_min_words, int(chunking_config.get("adaptive_max_words", 160)))
+    semantic_model = chunking_config.get("semantic_model", "sentence-transformers/all-MiniLM-L6-v2")
+    semantic_similarity_threshold = float(chunking_config.get("semantic_similarity_threshold", 0.72))
+    semantic_min_words = max(1, int(chunking_config.get("semantic_min_words", 80)))
+    semantic_max_words = max(semantic_min_words, int(chunking_config.get("semantic_max_words", 160)))
+    semantic_min_sentences = max(1, int(chunking_config.get("semantic_min_sentences", 2)))
+    semantic_max_sentences = max(semantic_min_sentences, int(chunking_config.get("semantic_max_sentences", 6)))
 
     chunks: list[dict] = []
     for _, row in corpus_df.iterrows():
@@ -299,6 +381,16 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
                     para_text,
                     min_words=adaptive_min_words,
                     max_words=adaptive_max_words,
+                )
+            elif strategy == "semantic_similarity":
+                derived_chunks = _semantic_similarity_chunks(
+                    para_text,
+                    model_name=semantic_model,
+                    similarity_threshold=semantic_similarity_threshold,
+                    min_words=semantic_min_words,
+                    max_words=semantic_max_words,
+                    min_sentences=semantic_min_sentences,
+                    max_sentences=semantic_max_sentences,
                 )
             else:
                 raise ValueError(f"Unsupported chunking strategy: {strategy}")

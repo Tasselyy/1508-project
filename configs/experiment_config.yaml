@@ -11,6 +11,12 @@ chunking:
   sentence_window_stride: 2   # Sliding stride for sentence_window
   adaptive_min_words: 80      # Lower target for adaptive_sentence chunks
   adaptive_max_words: 160     # Upper target for adaptive_sentence chunks
+  semantic_model: "sentence-transformers/all-MiniLM-L6-v2"
+  semantic_similarity_threshold: 0.72
+  semantic_min_words: 80
+  semantic_max_words: 160
+  semantic_min_sentences: 2
+  semantic_max_sentences: 6
 
 queries:
   sample_size_per_group: 150  # Queries per entity group (single-entity, multi-entity)

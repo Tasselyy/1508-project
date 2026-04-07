@@ -86,6 +86,17 @@ def main():
                 "adaptive_max_words": 160,
             }
         },
+        "semantic_similarity": {
+            "chunking": {
+                "strategy": "semantic_similarity",
+                "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+                "semantic_similarity_threshold": 0.72,
+                "semantic_min_words": 60,
+                "semantic_max_words": 120,
+                "semantic_min_sentences": 2,
+                "semantic_max_sentences": 5,
+            }
+        },
     }
 
     rows = []
