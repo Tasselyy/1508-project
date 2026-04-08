@@ -45,3 +45,4 @@ data/
 .ragatouille/
 results/faiss_index/
 results/colbert_index/
+results/ablation/

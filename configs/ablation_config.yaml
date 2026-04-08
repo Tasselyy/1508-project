@@ -1,0 +1,41 @@
+# Ablation Experiment Configuration
+# Reuses cached corpus from main benchmark for fast, low-memory runs (<4 GB RAM)
+
+test_set:
+  num_queries: 30                # Total queries (15 single-entity + 15 multi-entity)
+  queries_per_group: 15
+  seed: 42
+  main_corpus_cache: "data/corpus_cache.parquet"  # Reuse main benchmark corpus (224 pages)
+
+# Ablation dimensions: vary one factor at a time, hold others at default
+dimensions:
+  corpus_scale:
+    values: [50, 100, 200]       # Number of Wikipedia pages (subsampled from cached corpus)
+    default_chunking: "paragraph"
+
+  chunk_granularity:
+    values: ["paragraph", "fixed-256", "fixed-512"]  # Chunking strategies
+    default_corpus_size: 50
+
+  top_k:
+    values: [1, 3, 5, 10, 20]   # k values for Recall@k evaluation
+
+# Model settings (same as main config)
+models:
+  biencoder: "sentence-transformers/all-MiniLM-L6-v2"
+  colbert: "colbert-ir/colbertv2.0"
+
+colbert:
+  bsize: 32
+
+spacy:
+  model: "en_core_web_sm"
+  entity_threshold: 2
+
+# Output paths
+paths:
+  results_dir: "results/ablation"
+  charts_dir: "results/ablation/charts"
+  csv_output: "results/ablation/ablation_summary.csv"
+  faiss_index_dir: "results/ablation/faiss_index"
+  colbert_index_dir: "results/ablation/colbert_index"
