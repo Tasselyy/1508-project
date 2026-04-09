@@ -1,4 +1,4 @@
-# Architecture Overview
+﻿# Architecture Overview
 
 This document describes the modular architecture of the ColBERTv2 vs Bi-Encoder retrieval benchmark system.
 

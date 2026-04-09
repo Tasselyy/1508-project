@@ -1,4 +1,4 @@
-# Ablation Experiment Configuration
+﻿# Ablation Experiment Configuration
 # Reuses cached corpus from main benchmark for fast, low-memory runs (<4 GB RAM)
 
 test_set:

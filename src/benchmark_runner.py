@@ -1,4 +1,4 @@
-"""Reusable benchmark runner utilities for single and multi-config experiments."""
+"""Reusable utilities for running benchmark experiments."""
 
 import gc
 import json
@@ -30,6 +30,38 @@ def deep_update(base: dict, overrides: dict) -> dict:
         else:
             merged[key] = value
     return merged
+
+
+def configure_run_paths(base_config: dict, run_subdir: str, cache_suffix: str | None = None) -> dict:
+    """Route one benchmark run to a dedicated result directory."""
+    config = deepcopy(base_config)
+    result_root = Path(base_config["paths"]["results_dir"]) / run_subdir
+    result_root.mkdir(parents=True, exist_ok=True)
+
+    config["paths"]["results_dir"] = str(result_root)
+    config["paths"]["faiss_index_dir"] = str(result_root / "faiss_index")
+    config["paths"]["colbert_index_dir"] = str(result_root / "colbert_index")
+    config["paths"]["json_log"] = str(result_root / "benchmark_log.json")
+    config["paths"]["charts_dir"] = str(result_root / "charts")
+    config["paths"]["csv_output"] = str(result_root / "summary_statistics.csv")
+
+    if cache_suffix:
+        cache_file = Path(base_config["corpus"]["local_corpus_cache"])
+        config["corpus"]["local_corpus_cache"] = str(
+            cache_file.with_name(f"{cache_file.stem}_{cache_suffix}{cache_file.suffix}")
+        )
+    return config
+
+
+def build_variant_config(
+    base_config: dict,
+    run_subdir: str,
+    overrides: dict | None = None,
+    cache_suffix: str | None = None,
+) -> dict:
+    """Apply overrides and isolate outputs for one named experiment variant."""
+    config = deep_update(base_config, overrides or {})
+    return configure_run_paths(config, run_subdir=run_subdir, cache_suffix=cache_suffix)
 
 
 def _log_query_results(sampled_queries: list[dict], profiler: Profiler, config: dict) -> None:

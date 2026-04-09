@@ -1,4 +1,4 @@
-"""Run ablation experiments: systematically vary one factor at a time on a small test set.
+﻿"""Run ablation experiments: systematically vary one factor at a time on a small test set.
 
 Designed for low memory usage (<4 GB RAM) by reusing the cached corpus
 from the main benchmark instead of streaming Wikipedia.

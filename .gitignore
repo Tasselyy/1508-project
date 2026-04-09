@@ -45,9 +45,7 @@ temp/
 # Data cache & results (generated)
 data/
 .ragatouille/
-results/faiss_index/
-results/colbert_index/
-results/ablation/
+results/
 
 # LaTeX build artifacts
 final-report/*.aux

@@ -1,164 +1,111 @@
-# ColBERTv2 vs Bi-Encoder Retrieval Benchmark
+# Retrieval Benchmark Project
 
-A standalone benchmark comparing ColBERTv2 (late interaction) against a bi-encoder baseline (MiniLM) on the KILT NaturalQuestions dev set.
+This project studies retrieval quality for RAG under different chunking strategies and retrieval architectures.
+The current workflow is centered on a single notebook:
 
-## Setup
+- [run_benchmark.ipynb](/C:/Users/Cosmo/Documents/GitHub/1508-project/notebooks/run_benchmark.ipynb)
 
-### Prerequisites
+The notebook runs the project step by step:
+
+- data pipeline
+- paragraph benchmark
+- sentence-window benchmark
+- adaptive-sentence benchmark
+- semantic-similarity benchmark
+- enhanced adaptive-sentence benchmark
+- error analysis
+- lightweight knowledge graph prototype
+- summary comparison charts
+
+## Recommended Workflow
+
+Use the notebook as the main entry point and execute sections one at a time.
+Do not run the whole notebook blindly on a small local machine.
+
+Recommended order:
+
+1. `Setup`
+2. `Data Pipeline`
+3. Paragraph benchmark
+4. The additional strategy sections you actually want
+5. Summary comparison
+6. Error analysis / knowledge graph sections only when needed
+
+## Config Files
+
+- [quick_ablation.yaml](/C:/Users/Cosmo/Documents/GitHub/1508-project/configs/quick_ablation.yaml)
+  Used for smaller, faster local runs.
+- [experiment_config.yaml](/C:/Users/Cosmo/Documents/GitHub/1508-project/configs/experiment_config.yaml)
+  Used for larger runs, especially on a stronger GPU machine such as Runpod.
+
+## Environment Setup
+
+Requirements:
 
 - Python 3.10+
-- GPU recommended (NVIDIA with CUDA support) for ColBERTv2 indexing
-- ~20 GB disk space for data and indexes
+- NVIDIA GPU recommended for ColBERT indexing
+- `en_core_web_sm` spaCy model
 
-### Installation
+Install:
 
 ```bash
-# Create and activate virtual environment
-uv venv .venv
-.venv\Scripts\activate   # Windows PowerShell
-# source .venv/bin/activate  # Linux/Mac
+python -m venv .venv
+source .venv/bin/activate
+# Windows PowerShell:
+# .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
-uv pip install -r requirements.txt
-
-# Download spaCy model
+pip install --upgrade pip
+pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
-### Data Download
+## Data and Outputs
 
 Data is downloaded automatically on first run:
 
-1. **KILT NQ dev set** (~50 MB) — downloaded via HuggingFace `datasets`
-2. **KILT Wikipedia** (~35 GB streamed) — only ~10K pages are kept; cached locally at `data/corpus_cache.parquet` for subsequent runs
+- KILT NaturalQuestions validation set
+- streamed KILT Wikipedia source
 
-To skip streaming on repeat runs, ensure the cache file exists at the path specified in `configs/experiment_config.yaml` → `corpus.local_corpus_cache`.
+Important directories:
 
-## Running the Benchmark
+- `data/`
+  local corpus caches
+- `results/`
+  generated logs, CSV summaries, charts, indexes
 
-Open and run the Jupyter notebook end-to-end:
-
-```bash
-jupyter notebook notebooks/run_benchmark.ipynb
-```
-
-The notebook executes:
-1. **Data Pipeline** — loads NQ queries, builds reduced Wikipedia corpus, chunks paragraphs, classifies queries by NER entity count
-2. **Bi-Encoder Retrieval** — encodes chunks with `all-MiniLM-L6-v2`, builds FAISS index, retrieves top-k
-3. **ColBERTv2 Retrieval** — indexes chunks with RAGatouille ColBERTv2, retrieves top-k with late interaction
-4. **JSON Log** — saves all profiling data and per-query results to `results/benchmark_log.json`
-5. **Evaluation** — computes Recall@k from JSON log, grouped by entity complexity
-6. **Visualization** — generates charts and CSV summary table
-
-## Configuration
-
-Edit `configs/experiment_config.yaml` to adjust:
-
-| Parameter | Default | Description |
-|---|---|---|
-| `corpus.target_size` | 10000 | Number of Wikipedia pages in reduced corpus |
-| `queries.sample_size_per_group` | 500 | Queries per entity group |
-| `retrieval.k_values` | [1, 5, 10, 20] | Top-k values for retrieval |
-| `spacy.entity_threshold` | 2 | NER entity count threshold for multi-entity classification |
-
-## Hardware Requirements
-
-| Resource | Minimum | Recommended |
-|---|---|---|
-| GPU VRAM | 4 GB (use 5K corpus) | 8+ GB (10K corpus) |
-| RAM | 16 GB | 32 GB |
-| Disk | 10 GB | 20 GB |
-| Time | ~30 min (GPU) | ~1 hour (CPU-only) |
-
-If ColBERTv2 indexing fails due to VRAM overflow, reduce `corpus.target_size` to 5000 in the config.
-
-## Ablation Experiments
-
-Run systematic ablation studies across corpus scale, chunk granularity, and top-k depth:
-
-```bash
-python run_ablation.py
-```
-
-Configuration: `configs/ablation_config.yaml`. See `doc/experiment_guide.md` for details on each ablation dimension.
-
-Results are written to `results/ablation/`.
-
-## Output
-
-All results are written to the `results/` directory:
-
-- `benchmark_log.json` — Single source of truth: timing, GPU/RAM metrics, disk sizes, per-query results, run metadata
-- `charts/` — PNG visualizations (Recall@k bar chart, histograms, latency comparison, index size comparison)
-- `summary_statistics.csv` — Recall@k summary table with delta columns
-- `faiss_index/` — Saved FAISS index
-- `colbert_index/` — Saved ColBERT PLAID index
-
-### JSON Log Structure
-
-```json
-{
-  "metadata": {
-    "timestamp": "...",
-    "config": {...},
-    "gpu_device": "NVIDIA ...",
-    "gpu_total_vram_bytes": ...,
-    "corpus_size": 10000,
-    "total_chunks": ...,
-    "total_queries": ...,
-    "queries_per_group": {"single-entity": ..., "multi-entity": ...},
-    "models": {...},
-    "k_values": [1, 5, 10, 20]
-  },
-  "stages": {
-    "data_loading": {"duration_seconds": ..., "peak_vram_bytes": ..., "rss_bytes": ...},
-    ...
-  },
-  "queries": [
-    {
-      "query": "...",
-      "entity_count": 1,
-      "entity_list": ["..."],
-      "entity_group": "single-entity",
-      "ground_truth_chunk_ids": ["..."],
-      "biencoder_retrieved_ids": ["..."],
-      "biencoder_recall_at_k": {"1": ..., "5": ..., "10": ..., "20": ...},
-      "biencoder_latency_ms": ...,
-      "colbert_retrieved_ids": ["..."],
-      "colbert_recall_at_k": {"1": ..., "5": ..., "10": ..., "20": ...},
-      "colbert_latency_ms": ...
-    }
-  ],
-  "disk_sizes": {"faiss_index": ..., "colbert_index": ...}
-}
-```
+These are runtime artifacts and can be regenerated.
 
 ## Project Structure
 
+```text
+configs/
+  experiment_config.yaml
+  quick_ablation.yaml
+
+notebooks/
+  run_benchmark.ipynb
+
+src/
+  benchmark_runner.py
+  biencoder_retrieval.py
+  colbert_retrieval.py
+  data_pipeline.py
+  error_analysis.py
+  evaluation.py
+  knowledge_graph.py
+  profiler.py
+  visualize.py
+
+reports/
+  report_en.md
+  report_zh.md
+
+requirements.txt
+README.md
 ```
-├── configs/
-│   ├── experiment_config.yaml   # Main benchmark configuration
-│   └── ablation_config.yaml     # Ablation experiment configuration
-├── doc/
-│   ├── architecture.md          # System architecture overview
-│   ├── experiment_guide.md      # Detailed experiment guide
-│   └── data_format.md           # Data format reference
-├── notebooks/
-│   └── run_benchmark.ipynb      # Demo notebook (end-to-end pipeline)
-├── src/
-│   ├── profiler.py              # Stage timing, GPU/RAM/disk profiling
-│   ├── data_pipeline.py         # KILT data loading, chunking, NER classification
-│   ├── biencoder_retrieval.py   # MiniLM encoding, FAISS indexing, retrieval
-│   ├── colbert_retrieval.py     # RAGatouille ColBERTv2 indexing, retrieval
-│   ├── evaluation.py            # Recall@k computation from JSON log
-│   ├── visualize.py             # Charts, histograms, CSV export
-│   ├── ablation.py              # Ablation test set construction
-│   └── ablation_visualize.py    # Ablation-specific visualizations
-├── results/                     # Output directory (generated)
-├── reports/                     # Experiment reports
-├── final-report/                # LaTeX report
-├── run_benchmark.py             # Main benchmark script
-├── run_ablation.py              # Ablation experiment script
-├── requirements.txt
-└── README.md
-```
+
+## Notes
+
+- Local machines can hit memory limits during ColBERT indexing for heavier variants.
+- For large runs, prefer a stronger GPU machine and run notebook sections individually.
+- The notebook writes each strategy run to its own folder under `results/notebook/<variant>/`.

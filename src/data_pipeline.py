@@ -1,4 +1,4 @@
-"""Data pipeline: KILT NQ loading, reduced corpus construction, chunking, NER classification, ground-truth extraction."""
+"""Data pipeline utilities for corpus building, chunking, and query preparation."""
 
 import gc
 import hashlib
@@ -18,6 +18,12 @@ from src.profiler import Profiler
 
 KILT_WIKIPEDIA_URL = "http://dl.fbaipublicfiles.com/KILT/kilt_knowledgesource.json"
 _SENTENCE_SPLITTER = re.compile(r"(?<=[.!?])\s+")
+_TOKEN_PATTERN = re.compile(r"\b[\w'-]+\b")
+_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "he", "in", "is",
+    "it", "its", "of", "on", "or", "that", "the", "their", "this", "to", "was", "were", "will",
+    "with", "who", "which", "what", "when", "where", "why", "how",
+}
 _SENTENCE_ENCODER_CACHE: dict[str, SentenceTransformer] = {}
 
 
@@ -207,6 +213,17 @@ def _split_sentences(text: str) -> list[str]:
     return sentences or [text.strip()]
 
 
+def _keyword_tokens(text: str) -> set[str]:
+    tokens = set()
+    for token in _TOKEN_PATTERN.findall(text.lower()):
+        if token in _STOPWORDS:
+            continue
+        if len(token) <= 2 and not token.isdigit():
+            continue
+        tokens.add(token)
+    return tokens
+
+
 def _get_sentence_encoder(model_name: str) -> SentenceTransformer:
     """Load and cache the sentence embedding model used for semantic chunking."""
     if model_name not in _SENTENCE_ENCODER_CACHE:
@@ -259,6 +276,50 @@ def _adaptive_sentence_chunks(
             chunks.append(" ".join(current).strip())
             current = []
             current_words = 0
+
+    if current:
+        chunks.append(" ".join(current).strip())
+
+    return [chunk for chunk in chunks if chunk]
+
+
+def _adaptive_sentence_keyword_chunks(
+    paragraph_text: str,
+    min_words: int,
+    max_words: int,
+    keyword_slack_words: int,
+    keyword_min_overlap: int,
+) -> list[str]:
+    """Adaptive sentence chunking with a soft extension on keyword overlap."""
+    sentences = _split_sentences(paragraph_text)
+    chunks: list[str] = []
+    current: list[str] = []
+    current_words = 0
+    current_keywords: set[str] = set()
+    hard_max_words = max_words + max(0, keyword_slack_words)
+
+    for sentence in sentences:
+        sentence_words = len(sentence.split())
+        sentence_keywords = _keyword_tokens(sentence)
+        keyword_overlap = len(current_keywords & sentence_keywords)
+        effective_max_words = hard_max_words if keyword_overlap >= keyword_min_overlap else max_words
+
+        if current and current_words >= min_words and current_words + sentence_words > effective_max_words:
+            chunks.append(" ".join(current).strip())
+            current = []
+            current_words = 0
+            current_keywords = set()
+            effective_max_words = max_words
+
+        current.append(sentence)
+        current_words += sentence_words
+        current_keywords.update(sentence_keywords)
+
+        if current_words >= effective_max_words:
+            chunks.append(" ".join(current).strip())
+            current = []
+            current_words = 0
+            current_keywords = set()
 
     if current:
         chunks.append(" ".join(current).strip())
@@ -344,6 +405,8 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
     sentence_window_stride = max(1, int(chunking_config.get("sentence_window_stride", 2)))
     adaptive_min_words = max(1, int(chunking_config.get("adaptive_min_words", 80)))
     adaptive_max_words = max(adaptive_min_words, int(chunking_config.get("adaptive_max_words", 160)))
+    adaptive_keyword_slack_words = max(0, int(chunking_config.get("adaptive_keyword_slack_words", 40)))
+    adaptive_keyword_min_overlap = max(1, int(chunking_config.get("adaptive_keyword_min_overlap", 1)))
     semantic_model = chunking_config.get("semantic_model", "sentence-transformers/all-MiniLM-L6-v2")
     semantic_similarity_threshold = float(chunking_config.get("semantic_similarity_threshold", 0.72))
     semantic_min_words = max(1, int(chunking_config.get("semantic_min_words", 80)))
@@ -381,6 +444,14 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
                     para_text,
                     min_words=adaptive_min_words,
                     max_words=adaptive_max_words,
+                )
+            elif strategy == "adaptive_sentence_keyword":
+                derived_chunks = _adaptive_sentence_keyword_chunks(
+                    para_text,
+                    min_words=adaptive_min_words,
+                    max_words=adaptive_max_words,
+                    keyword_slack_words=adaptive_keyword_slack_words,
+                    keyword_min_overlap=adaptive_keyword_min_overlap,
                 )
             elif strategy == "semantic_similarity":
                 derived_chunks = _semantic_similarity_chunks(

@@ -11,6 +11,8 @@ chunking:
   sentence_window_stride: 2   # Sliding stride for sentence_window
   adaptive_min_words: 80      # Lower target for adaptive_sentence chunks
   adaptive_max_words: 160     # Upper target for adaptive_sentence chunks
+  adaptive_keyword_slack_words: 40
+  adaptive_keyword_min_overlap: 1
   semantic_model: "sentence-transformers/all-MiniLM-L6-v2"
   semantic_similarity_threshold: 0.72
   semantic_min_words: 80

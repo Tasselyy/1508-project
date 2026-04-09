@@ -1,4 +1,4 @@
-# Data Format Reference
+﻿# Data Format Reference
 
 This document describes the data formats used throughout the benchmark pipeline.
 
