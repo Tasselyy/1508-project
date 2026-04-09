@@ -244,17 +244,93 @@ The profiling data quantifies a substantial compute-recall tradeoff between the 
 
 ---
 
-## 8. Discussion
+## 8. Ablation Studies
 
-### 8.1 Implications for Adaptive Chunking
+To complement the main benchmark, a series of ablation experiments was conducted to isolate the effects of three key pipeline parameters on retrieval quality: chunk granularity, corpus scale, and top-k retrieval depth. All ablation experiments were run on a small test set of 30 queries drawn from the KILT NQ development split, using a 50-page default corpus subsampled from the main 224-page cached corpus. The entire ablation suite ran within a RAM budget of less than 4 GB, demonstrating that meaningful retrieval analysis is feasible on resource-constrained hardware.
+
+### 8.1 Chunk Granularity Ablation
+
+The chunking strategy determines how source documents are segmented into retrievable units. Three strategies were compared: paragraph-level splitting (the default used in the main benchmark), fixed-length splitting at 256 tokens, and fixed-length splitting at 512 tokens.
+
+| Chunking Strategy | Bi-Enc R@1 | Bi-Enc R@5 | Bi-Enc R@10 | ColBERT R@1 | ColBERT R@5 | ColBERT R@10 |
+|---|---|---|---|---|---|---|
+| Paragraph | 0.228 | 0.608 | 0.751 | 0.418 | 0.674 | 0.733 |
+| Fixed-256 | 0.148 | 0.479 | 0.568 | 0.126 | 0.430 | 0.599 |
+| Fixed-512 | 0.138 | 0.432 | 0.501 | 0.137 | 0.372 | 0.445 |
+
+![Chunk granularity recall comparison](../results/ablation/charts/chunk_granularity_recall.png)
+
+**Paragraph chunking is decisively superior.** For both retrieval models, paragraph-level chunks outperform fixed-length chunks by a wide margin across all values of k. The bi-encoder's Recall@10 drops from 0.751 with paragraph chunks to 0.568 with fixed-256 and 0.501 with fixed-512, representing absolute declines of 18.3 and 25.0 percentage points respectively. ColBERTv2 shows an even more dramatic degradation: Recall@10 falls from 0.733 to 0.599 (fixed-256) and 0.445 (fixed-512), a loss of up to 28.8 percentage points.
+
+**ColBERTv2's advantage is contingent on chunk quality.** Under paragraph chunking, ColBERTv2 leads the bi-encoder by a substantial margin at Recall@1 (+19.0 pp: 0.418 vs. 0.228). This advantage virtually disappears under fixed-length chunking: with fixed-256 tokens, ColBERTv2 actually trails the bi-encoder at R@1 (0.126 vs. 0.148), and with fixed-512 tokens the two models are nearly identical (0.137 vs. 0.138). This interaction effect reveals that ColBERTv2's fine-grained token-level matching is most effective when chunk boundaries align with natural semantic units. When chunks are arbitrarily split at fixed token boundaries, the MaxSim operation loses its advantage because the token-level signals within a chunk no longer correspond to coherent semantic content.
+
+**Fixed-512 underperforms fixed-256.** Contrary to the intuition that longer chunks provide more context, fixed-512 chunks perform worse than fixed-256 for both models. This suggests that at 512 tokens, chunks frequently span multiple unrelated topics, diluting the semantic signal and making both dense-vector and token-level matching less effective.
+
+### 8.2 Corpus Scale Ablation
+
+To assess whether retrieval quality degrades as corpus size increases (due to a larger distractor pool), the same 30 queries were evaluated against corpora of 50, 100, and 200 pages, all using paragraph-level chunking.
+
+| Corpus Size | Bi-Enc R@1 | Bi-Enc R@5 | Bi-Enc R@10 | ColBERT R@1 | ColBERT R@5 | ColBERT R@10 |
+|---|---|---|---|---|---|---|
+| 50 pages | 0.228 | 0.608 | 0.751 | 0.418 | 0.674 | 0.733 |
+| 100 pages | 0.228 | 0.608 | 0.751 | 0.418 | 0.681 | 0.733 |
+| 200 pages | 0.228 | 0.608 | 0.740 | 0.401 | 0.663 | 0.740 |
+
+![Corpus scale recall comparison](../results/ablation/charts/corpus_scale_recall.png)
+
+**The bi-encoder is remarkably robust to corpus scale.** Across all three corpus sizes, the bi-encoder's Recall@1 and Recall@5 remain completely unchanged (0.228 and 0.608 respectively). Only at Recall@10 does a marginal decline appear at 200 pages (0.740 vs. 0.751), a drop of just 1.1 percentage points. This stability indicates that FAISS inner-product search effectively discriminates relevant passages from distractors even as the distractor pool quadruples.
+
+**ColBERTv2 shows slight degradation at 200 pages.** ColBERTv2's Recall@1 drops from 0.418 to 0.401 at 200 pages (-1.7 pp), and Recall@5 declines from 0.674 to 0.663 (-1.1 pp). Interestingly, ColBERTv2's Recall@10 at 200 pages (0.740) slightly exceeds its value at 50 pages (0.733), suggesting that the additional pages may introduce some passages that are partial matches and rise into the top-10. The slight Recall@1 degradation at scale is consistent with the PLAID index's approximate nature: as the number of centroids and candidate passages grows, the approximation may admit more near-miss distractors into the top ranks.
+
+**Scale effects are modest overall.** The minimal variation across corpus sizes suggests that, at least within the range of 50-200 pages, retrieval quality is primarily determined by chunk quality and model architecture rather than by the volume of distractors. This finding supports the validity of the main benchmark's 224-page corpus as a reasonable evaluation setting.
+
+### 8.3 Top-k Depth Ablation
+
+The top-k retrieval depth was varied across k in {1, 3, 5, 10, 20} to characterize how recall scales with the number of retrieved passages, using the 50-page corpus with paragraph chunking.
+
+| k | Bi-Encoder Recall@k | ColBERTv2 Recall@k |
+|---|---|---|
+| 1 | 0.228 | 0.418 |
+| 3 | 0.532 | 0.606 |
+| 5 | 0.608 | 0.674 |
+| 10 | 0.751 | 0.733 |
+| 20 | 0.850 | 0.814 |
+
+![Top-k recall comparison](../results/ablation/charts/top_k_recall.png)
+
+**ColBERTv2 dominates at small k, but the bi-encoder surpasses it at larger k.** At k=1, ColBERTv2 leads by a commanding 19.0 percentage points (0.418 vs. 0.228). This gap narrows progressively: at k=3, the lead is 7.4 pp (0.606 vs. 0.532); at k=5, it is 6.6 pp (0.674 vs. 0.608). By k=10, the bi-encoder overtakes ColBERTv2 (0.751 vs. 0.733, a reversal of +1.8 pp), and at k=20 the bi-encoder leads by 3.6 pp (0.850 vs. 0.814).
+
+**This crossover pattern is consistent with the main benchmark findings** (Section 5.1), where the same reversal was observed at k=10 on the full 260-query evaluation. The ablation results amplify the pattern: on the smaller test set with paragraph chunks, ColBERTv2's Recall@1 advantage is much larger (19.0 pp vs. 2.6 pp in the main benchmark), likely because the smaller, cleaner corpus with well-aligned paragraph chunks provides ideal conditions for MaxSim token-level scoring.
+
+**Diminishing returns at large k.** The bi-encoder's recall curve shows steep gains from k=1 to k=10 (+52.3 pp) but flattens from k=10 to k=20 (+9.9 pp). ColBERTv2 shows a similar pattern: +31.5 pp from k=1 to k=10 and +8.1 pp from k=10 to k=20. This suggests that for both models, k=10 captures the bulk of retrievable relevant passages, and increasing k beyond 10 yields diminishing returns while increasing the proportion of irrelevant passages that a downstream reader must process.
+
+### 8.4 Summary of Ablation Findings
+
+The ablation experiments yield four principal insights:
+
+1. **Chunk granularity is the dominant factor.** Paragraph-level chunking outperforms fixed-length chunking by 18-29 percentage points in Recall@10 depending on the model. This is a larger effect than any model architecture difference, confirming that chunking strategy is the primary lever for retrieval quality.
+
+2. **ColBERTv2's advantage depends on chunk quality.** The late-interaction model's 19 percentage point Recall@1 advantage under paragraph chunking collapses entirely under fixed-length chunking. This interaction effect implies that deploying ColBERTv2 without careful chunking may negate its architectural benefits.
+
+3. **Corpus scale has a secondary effect.** Quadrupling the corpus from 50 to 200 pages produces at most a 1.7 pp decline in recall for ColBERTv2 and negligible change for the bi-encoder. Retrieval quality at this scale is not distractor-limited.
+
+4. **The optimal k depends on the use case.** For applications requiring a single best passage (e.g., direct answer extraction), ColBERTv2 at k=1-5 is strongly preferred. For applications that benefit from diverse candidate passages (e.g., multi-passage summarization or reranking pipelines), the bi-encoder at k=10-20 provides superior recall at lower computational cost.
+
+---
+
+## 9. Discussion
+
+### 9.1 Implications for Adaptive Chunking
 
 This benchmark uses uniform paragraph-level chunking for both models. The results establish a retrieval quality ceiling under the current chunking scheme and motivate the adaptive chunking experiments that follow.
 
-Both models achieve relatively low absolute recall (under 27% at k=20), suggesting that the primary bottleneck may be at the chunking level rather than the model architecture level. Even ColBERTv2's superior token-level matching cannot retrieve a passage that does not exist as a chunk because the relevant information was split across paragraph boundaries. This finding strongly motivates adaptive chunking research: if chunk boundaries can be adjusted to better align with answer spans, both retrieval architectures should benefit.
+Both models achieve relatively low absolute recall (under 27% at k=20) in the main benchmark, suggesting that the primary bottleneck may be at the chunking level rather than the model architecture level. Even ColBERTv2's superior token-level matching cannot retrieve a passage that does not exist as a chunk because the relevant information was split across paragraph boundaries. This finding strongly motivates adaptive chunking research: if chunk boundaries can be adjusted to better align with answer spans, both retrieval architectures should benefit.
+
+The ablation study (Section 8) provides direct evidence for this thesis. The chunk granularity ablation demonstrates that paragraph-level chunking outperforms fixed-length chunking by 18-29 percentage points in Recall@10, an effect far larger than any model architecture difference observed in the main benchmark. Moreover, the interaction between chunking strategy and model architecture -- ColBERTv2's advantage appearing only with paragraph chunks and disappearing with fixed-length chunks -- indicates that adaptive chunking strategies must be co-designed with the retrieval model. An adaptive system that dynamically selects chunk boundaries based on document structure could amplify ColBERTv2's token-level matching advantage while maintaining the bi-encoder's robustness as a fallback.
 
 The crossover pattern -- ColBERTv2 better at small k, bi-encoder better at large k -- suggests that adaptive chunking may interact differently with the two architectures. Shorter, more focused chunks might amplify ColBERTv2's precision advantage by providing tighter query-passage alignment for MaxSim scoring, while longer chunks with more context might benefit the bi-encoder by providing richer single-vector representations.
 
-### 8.2 Limitations of the Reduced Corpus
+### 9.2 Limitations of the Reduced Corpus
 
 The benchmark uses a corpus of 224 Wikipedia pages rather than the full KILT Wikipedia snapshot (~5.9M pages). This has several consequences:
 
@@ -262,26 +338,38 @@ The benchmark uses a corpus of 224 Wikipedia pages rather than the full KILT Wik
 - **Coverage**: With only 224 pages, some gold passages may be split or merged during chunking in ways that affect matchability. The 11,901 chunks provide reasonable coverage but do not replicate the scale challenges of a full corpus.
 - **Distractor quality**: Random sampling of 85 distractor pages may produce an atypically easy or hard distractor set depending on the random seed (seed=42 was used). Future work should consider stratified distractor sampling or multiple random seeds for robustness.
 
-### 8.3 Entity Classification Quality
+The corpus scale ablation (Section 8.2) partially addresses the scale concern: increasing the corpus from 50 to 200 pages produced minimal recall degradation for the bi-encoder and only marginal degradation for ColBERTv2, suggesting that the relative model rankings are stable within this scale range. However, extrapolation to corpora orders of magnitude larger (thousands or millions of pages) remains an open question.
+
+### 9.3 Entity Classification Quality
 
 The spaCy `en_core_web_sm` pipeline is a small, fast model suitable for development-time NER but may not be accurate enough for rigorous entity-stratified analysis. Misclassified entities shift queries between the single-entity and multi-entity groups, attenuating any real performance difference. The unexpected finding that multi-entity queries do not show a larger ColBERTv2 advantage could be partially attributed to NER noise. A more robust analysis could use a larger spaCy model (`en_core_web_trf`) or cross-validate entity counts with a second NER system.
 
-### 8.4 ColBERT CPU Execution Caveat
+### 9.4 ColBERT CPU Execution Caveat
 
 A significant limitation of this benchmark is that ColBERTv2 was unable to run on the GPU due to memory constraints (the model required approximately 15.71 GiB of VRAM, exceeding the 8 GB available on the RTX 4060 Laptop GPU). CPU execution introduced two effects:
 
 1. **Performance penalty**: The 224-second indexing time would likely be substantially reduced on a GPU with sufficient VRAM, making the 28x speed ratio an upper bound on the true cost difference.
 2. **Potential quality effects**: While the PLAID algorithm is deterministic, CPU execution may use different numerical precision or quantization paths than the GPU implementation, potentially affecting retrieval quality. Re-running on a GPU with 16+ GB VRAM would provide a more controlled comparison.
 
-### 8.5 Generalization Beyond NaturalQuestions
+### 9.5 Generalization Beyond NaturalQuestions
 
 NaturalQuestions originates from Google Search logs, which skews toward entity-lookup and factoid queries. The relative performance of ColBERTv2 vs. bi-encoders may differ on other query distributions (e.g., abstractive questions, multi-hop questions, or domain-specific technical queries). The broader ECE1508 project should validate findings on at least one additional dataset before drawing architecture conclusions.
 
+### 9.6 Ablation Study Limitations
+
+The ablation experiments (Section 8) were conducted on a small test set of 30 queries with a 50-page default corpus, which introduces additional caveats:
+
+- **Small sample size**: With only 30 queries, individual query results have an outsized impact on aggregate metrics. Confidence intervals around the reported recall values are wide, and the observed differences -- particularly the smaller ones in the corpus scale ablation -- may not be statistically significant.
+- **Subsampled corpus**: The 50-page default corpus is a further reduction from the already-reduced 224-page main corpus. While the corpus scale ablation extends to 200 pages, this still does not approach production-scale corpora.
+- **Limited chunking strategies**: Only three chunking strategies were tested (paragraph, fixed-256, fixed-512). Intermediate sizes, overlapping windows, and sentence-level chunking were not evaluated. The strong performance of paragraph chunking motivates further investigation into semantically-aware chunking strategies that could further improve upon paragraph boundaries.
+
+Despite these limitations, the ablation results provide directionally strong signals -- particularly the chunk granularity findings, where the effect sizes are large enough to be robust to sampling variation.
+
 ---
 
-## 9. Conclusion
+## 10. Conclusion
 
-This sub-experiment benchmarks ColBERTv2 late interaction retrieval against a MiniLM bi-encoder baseline on the KILT NaturalQuestions development set, using a reduced Wikipedia corpus of 224 pages (139 gold + 85 distractors) with paragraph-level chunking, producing 11,901 chunks evaluated over 260 queries.
+This sub-experiment benchmarks ColBERTv2 late interaction retrieval against a MiniLM bi-encoder baseline on the KILT NaturalQuestions development set, using a reduced Wikipedia corpus of 224 pages (139 gold + 85 distractors) with paragraph-level chunking, producing 11,901 chunks evaluated over 260 queries. A complementary ablation study on 30 queries further isolates the effects of chunk granularity, corpus scale, and top-k depth.
 
 **Key findings**:
 
@@ -289,6 +377,9 @@ This sub-experiment benchmarks ColBERTv2 late interaction retrieval against a Mi
 - **The bi-encoder is competitive at larger k.** At Recall@10 (-0.13 pp) and Recall@20 (-1.04 pp), the bi-encoder slightly outperforms ColBERTv2. The crossover reflects the bi-encoder's ability to distribute relevant passages more broadly across the top-k ranking.
 - **Entity-stratified hypothesis was not confirmed.** The ColBERTv2 advantage does not increase for multi-entity queries; in fact, the delta at k=5 reverses (bi-encoder outperforms by 0.95 pp on multi-entity queries). This suggests MiniLM's single-vector representation handles compositional queries adequately at this corpus scale.
 - **Multi-entity queries show higher recall overall.** Both models achieve higher absolute recall on multi-entity queries, likely due to the additional lexical and semantic anchors provided by multiple entity mentions.
+- **Chunk granularity is the single most impactful factor.** The ablation study demonstrates that paragraph chunking outperforms fixed-length chunking by 18-29 percentage points in Recall@10. This effect dwarfs the model architecture differences observed in the main benchmark, establishing chunking strategy as the primary lever for retrieval quality improvement.
+- **ColBERTv2's advantage is contingent on chunk quality.** Under paragraph chunking, ColBERTv2 leads the bi-encoder by 19 percentage points at Recall@1. This advantage disappears entirely under fixed-length chunking, revealing a critical interaction between chunking strategy and model architecture.
+- **Corpus scale has minimal impact within the tested range.** Quadrupling the corpus from 50 to 200 pages produces at most 1.7 pp recall degradation for ColBERTv2 and negligible change for the bi-encoder.
 - **ColBERTv2 indexing is ~28x slower** (224s vs. 8s), and **retrieval is ~5.5x slower** (6.28s vs. 1.15s for 260 queries). ColBERT also requires significantly more memory, needing 9.60 GB VRAM (which exceeded the available 8 GB, forcing CPU fallback).
 - **The latency-recall tradeoff suggests ColBERTv2 is best deployed as a reranker** rather than a first-stage retriever, particularly at this corpus scale where the bi-encoder provides competitive recall at much lower latency.
 
@@ -296,6 +387,7 @@ This sub-experiment benchmarks ColBERTv2 late interaction retrieval against a Mi
 
 1. Use the recall numbers from this benchmark as the fixed-chunking baseline to compare against adaptive chunking variants.
 2. Analyze the queries where both models fail: these are likely cases where the relevant information spans multiple chunks or is split at a paragraph boundary -- a strong signal for adaptive chunking.
-3. Implement sentence-level and sliding-window chunking and re-run the same benchmark to disentangle chunking effects from model architecture effects.
-4. Explore whether per-query chunk size selection (based on query entity count or query length) can close the gap between single-entity and multi-entity recall without changing the retrieval model.
-5. Evaluate the full pipeline (adaptive chunking + best retrieval model) on a held-out test set and a second domain to assess generalization.
+3. Implement semantically-aware chunking strategies informed by the ablation finding that paragraph boundaries provide superior chunk quality. Sentence-level, sliding-window, and hybrid paragraph-sentence chunking should be evaluated to determine whether finer-grained semantic boundaries can further improve recall.
+4. Co-design chunking with retrieval model selection, given the strong interaction effect: ColBERTv2 benefits disproportionately from well-aligned chunks, suggesting that an adaptive system should invest more effort in chunk boundary optimization when ColBERTv2 is the retriever.
+5. Explore whether per-query chunk size selection (based on query entity count or query length) can close the gap between single-entity and multi-entity recall without changing the retrieval model.
+6. Evaluate the full pipeline (adaptive chunking + best retrieval model) on a held-out test set and a second domain to assess generalization.
