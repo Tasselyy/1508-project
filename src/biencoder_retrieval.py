@@ -51,11 +51,11 @@ def retrieve_top_k(
     k: int = 20,
 ) -> tuple[list[str], float]:
     """Retrieve top-k chunk IDs for a query. Returns (chunk_ids, latency_ms)."""
+    start = time.perf_counter()
     q_emb = model.encode([query], normalize_embeddings=True)
     q_emb = np.asarray(q_emb, dtype=np.float32)
 
-    start = time.perf_counter()
-    scores, indices = index.search(q_emb, k)
+    _, indices = index.search(q_emb, k)
     latency_ms = (time.perf_counter() - start) * 1000
 
     retrieved_ids = [chunks[int(idx)]["chunk_id"] for idx in indices[0] if idx < len(chunks)]
@@ -70,8 +70,17 @@ def compute_recall_at_k(retrieved_ids: list[str], ground_truth_ids: set[str], k:
     """Compute Recall@k: fraction of ground-truth items found in top-k retrieved."""
     if not ground_truth_ids:
         return 0.0
-    top_k = set(retrieved_ids[:k])
-    return len(top_k & ground_truth_ids) / len(ground_truth_ids)
+    top_k = retrieved_ids[:k]
+
+    matched = 0
+    for ground_truth_id in ground_truth_ids:
+        if any(
+            retrieved_id == ground_truth_id
+            or retrieved_id.startswith(f"{ground_truth_id}_c")
+            for retrieved_id in top_k
+        ):
+            matched += 1
+    return matched / len(ground_truth_ids)
 
 
 # ---------------------------------------------------------------------------

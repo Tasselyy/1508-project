@@ -3,6 +3,7 @@
 import gc
 import logging
 import time
+from pathlib import Path
 
 import torch
 
@@ -72,6 +73,7 @@ from ragatouille import RAGPretrainedModel
 from src.profiler import Profiler
 
 logger = logging.getLogger(__name__)
+COLBERT_INDEX_NAME = "colbert_benchmark"
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +92,9 @@ def build_colbert_index(
         bsize: Batch size for ColBERT encoding during indexing. Lower values
                reduce peak VRAM usage (default 32, try 16 for 8GB VRAM).
     """
-    rag = RAGPretrainedModel.from_pretrained(model_name)
+    index_root = Path(index_path)
+    index_root.mkdir(parents=True, exist_ok=True)
+    rag = RAGPretrainedModel.from_pretrained(model_name, index_root=str(index_root))
 
     texts = [c["text"] for c in chunks]
     doc_ids = [c["chunk_id"] for c in chunks]
@@ -98,12 +102,27 @@ def build_colbert_index(
     rag.index(
         collection=texts,
         document_ids=doc_ids,
-        index_name="colbert_benchmark",
+        index_name=COLBERT_INDEX_NAME,
         split_documents=False,
         max_document_length=180,
         bsize=bsize,
     )
     return rag
+
+
+def resolve_colbert_index_path(index_path: str) -> Path:
+    """Best-effort resolution of the on-disk ColBERT index directory."""
+    configured = Path(index_path)
+    candidates = [
+        configured / COLBERT_INDEX_NAME,
+        configured,
+        Path(".ragatouille") / "colbert" / "indexes" / COLBERT_INDEX_NAME,
+        Path(".ragatouille") / "indexes" / COLBERT_INDEX_NAME,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return configured
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +154,17 @@ def compute_recall_at_k(retrieved_ids: list[str], ground_truth_ids: set[str], k:
     """Compute Recall@k: fraction of ground-truth items found in top-k retrieved."""
     if not ground_truth_ids:
         return 0.0
-    top_k = set(retrieved_ids[:k])
-    return len(top_k & ground_truth_ids) / len(ground_truth_ids)
+    top_k = retrieved_ids[:k]
+
+    matched = 0
+    for ground_truth_id in ground_truth_ids:
+        if any(
+            retrieved_id == ground_truth_id
+            or retrieved_id.startswith(f"{ground_truth_id}_c")
+            for retrieved_id in top_k
+        ):
+            matched += 1
+    return matched / len(ground_truth_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +204,9 @@ def run_colbert_retrieval(
     profiler.end_stage("colbert_indexing")
 
     # Record index disk size
-    profiler.record_disk_size("colbert_index", index_path)
+    resolved_index_path = resolve_colbert_index_path(index_path)
+    profiler.record_disk_size("colbert_index", str(resolved_index_path))
+    profiler.data["metadata"]["colbert_index_path"] = str(resolved_index_path)
 
     # Retrieve for each query
     profiler.start_stage("colbert_retrieval")

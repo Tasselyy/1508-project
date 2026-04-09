@@ -1,25 +1,29 @@
 # ColBERTv2 vs Bi-Encoder Retrieval Benchmark
 
-A standalone benchmark comparing ColBERTv2 (late interaction) against a bi-encoder baseline (MiniLM) on the KILT NaturalQuestions dev set.
+A benchmark-driven retrieval project for RAG on the KILT NaturalQuestions dev set, extended with adaptive chunking, semantic chunking, a lightweight learned boundary scorer, and knowledge-graph-assisted hybrid retrieval.
 
 ## Setup
 
 ### Prerequisites
 
 - Python 3.10+
-- GPU recommended (NVIDIA with CUDA support) for ColBERTv2 indexing
-- ~20 GB disk space for data and indexes
+- GPU recommended for ColBERTv2 indexing
+- spaCy English model: `en_core_web_sm`
+- Extra disk space for cached corpus files and retrieval indexes
 
 ### Installation
 
 ```bash
-# Create and activate virtual environment
-uv venv .venv
-.venv\Scripts\activate   # Windows PowerShell
-# source .venv/bin/activate  # Linux/Mac
+# Create and activate a virtual environment
+python -m venv .venv
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# Linux / macOS:
+# source .venv/bin/activate
 
 # Install dependencies
-uv pip install -r requirements.txt
+pip install --upgrade pip
+pip install -r requirements.txt
 
 # Download spaCy model
 python -m spacy download en_core_web_sm
@@ -29,136 +33,217 @@ python -m spacy download en_core_web_sm
 
 Data is downloaded automatically on first run:
 
-1. **KILT NQ dev set** (~50 MB) — downloaded via HuggingFace `datasets`
-2. **KILT Wikipedia** (~35 GB streamed) — only ~10K pages are kept; cached locally at `data/corpus_cache.parquet` for subsequent runs
+1. **KILT NQ dev set** via HuggingFace `datasets`
+2. **KILT Wikipedia** streamed to build a reduced local corpus
 
-To skip streaming on repeat runs, ensure the cache file exists at the path specified in `configs/experiment_config.yaml` → `corpus.local_corpus_cache`.
+The reduced corpus is cached locally so repeated runs do not need to rescan the full streamed source every time.
 
 ## Running the Benchmark
 
-Open and run the Jupyter notebook end-to-end:
+The main entry point is the notebook:
 
 ```bash
 jupyter notebook notebooks/run_benchmark.ipynb
 ```
 
-The notebook executes:
-1. **Data Pipeline** — loads NQ queries, builds reduced Wikipedia corpus, chunks paragraphs, classifies queries by NER entity count
-2. **Bi-Encoder Retrieval** — encodes chunks with `all-MiniLM-L6-v2`, builds FAISS index, retrieves top-k
-3. **ColBERTv2 Retrieval** — indexes chunks with RAGatouille ColBERTv2, retrieves top-k with late interaction
-4. **JSON Log** — saves all profiling data and per-query results to `results/benchmark_log.json`
-5. **Evaluation** — computes Recall@k from JSON log, grouped by entity complexity
-6. **Visualization** — generates charts and CSV summary table
+Run the notebook section by section rather than executing the full notebook blindly.
+
+The notebook covers:
+
+1. **Data Pipeline**
+   - load KILT queries
+   - build reduced Wikipedia corpus
+   - chunk documents
+   - classify queries by entity count
+2. **Bi-Encoder Retrieval**
+   - encode chunks with `all-MiniLM-L6-v2`
+   - build FAISS index
+   - retrieve top-k
+3. **ColBERTv2 Retrieval**
+   - build a ColBERT index with RAGatouille
+   - retrieve top-k using late interaction
+4. **Save JSON Log**
+   - save profiling metadata and per-query results
+5. **Evaluation**
+   - compute Recall@k from saved outputs
+6. **Visualization**
+   - generate summary charts and CSV tables
+7. **Chunking Variants**
+   - sentence window
+   - adaptive sentence
+   - semantic similarity
+8. **Error Analysis**
+9. **Knowledge Graph Prototype**
+10. **Hybrid Retrieval**
+    - graph only
+    - bi-encoder + graph
+    - ColBERT + graph
+    - selective ColBERT + graph fusion
+11. **Final Comparison Charts**
 
 ## Configuration
 
-Edit `configs/experiment_config.yaml` to adjust:
+Two main configs are provided:
 
-| Parameter | Default | Description |
-|---|---|---|
-| `corpus.target_size` | 10000 | Number of Wikipedia pages in reduced corpus |
-| `queries.sample_size_per_group` | 500 | Queries per entity group |
-| `retrieval.k_values` | [1, 5, 10, 20] | Top-k values for retrieval |
-| `spacy.entity_threshold` | 2 | NER entity count threshold for multi-entity classification |
+- `configs/quick_ablation.yaml`
+  - smaller and faster
+  - useful for local validation and chunking comparison
+- `configs/experiment_config.yaml`
+  - larger benchmark setting
+  - better for stronger machines or cloud GPUs
 
-## Hardware Requirements
+Important knobs include:
 
-| Resource | Minimum | Recommended |
-|---|---|---|
-| GPU VRAM | 4 GB (use 5K corpus) | 8+ GB (10K corpus) |
-| RAM | 16 GB | 32 GB |
-| Disk | 10 GB | 20 GB |
-| Time | ~30 min (GPU) | ~1 hour (CPU-only) |
+| Parameter | Description |
+|---|---|
+| `corpus.target_size` | number of Wikipedia pages kept in the reduced corpus |
+| `queries.sample_size_per_group` | number of sampled queries per entity group |
+| `retrieval.k_values` | values of k used for Recall@k |
+| `chunking.strategy` | active chunking strategy |
+| `chunking.adaptive_min_words` | minimum size for adaptive chunking |
+| `chunking.adaptive_max_words` | maximum size for adaptive chunking |
+| `chunking.semantic_similarity_threshold` | split threshold for semantic chunking |
 
-If ColBERTv2 indexing fails due to VRAM overflow, reduce `corpus.target_size` to 5000 in the config.
+## Chunking Strategies
 
-## Ablation Experiments
+The final notebook compares these retrieval units:
 
-Run systematic ablation studies across corpus scale, chunk granularity, and top-k depth:
+- `paragraph`
+  - default benchmark baseline
+- `sentence_window`
+  - fixed local sentence grouping
+- `adaptive_sentence`
+  - enhanced adaptive chunker used as the main practical baseline
+  - includes the lightweight learned boundary scorer in the final codebase
+- `semantic_similarity`
+  - embedding-based semantic chunker
 
-```bash
-python run_ablation.py
-```
+### Adaptive Sentence
 
-Configuration: `configs/ablation_config.yaml`. See `doc/experiment_guide.md` for details on each ablation dimension.
+The adaptive chunker works sentence by sentence inside each paragraph.
+It keeps adding sentences until the chunk reaches a target range, then decides whether to stop or continue a little longer.
 
-Results are written to `results/ablation/`.
+Main parameters:
+
+- `adaptive_min_words`
+  - minimum chunk size before a boundary is allowed
+- `adaptive_max_words`
+  - maximum chunk size before the chunk must stop
+- `adaptive_keyword_slack_words`
+  - allows slight extension when adjacent sentences still look locally coherent
+- `adaptive_keyword_min_overlap`
+  - minimum keyword overlap needed before slack is allowed
+
+In the final codebase, `adaptive_sentence` is the enhanced version used in the final experiments.
+
+### Semantic Similarity
+
+The semantic chunker encodes sentences with a sentence-transformer model and compares the next sentence against the current chunk representation.
+If cosine similarity falls below a threshold, a new chunk is started.
+
+Main parameters:
+
+- `semantic_model`
+- `semantic_similarity_threshold`
+- `semantic_min_words`
+- `semantic_max_words`
+
+## Knowledge Graph and Hybrid Retrieval
+
+The project also includes a lightweight knowledge graph prototype:
+
+- entities are extracted from chunks
+- entity-to-chunk links are created
+- co-occurrence edges are added between entities
+
+This graph can be used:
+
+- as a standalone graph retriever
+- as a signal fused with dense retrieval
+
+Hybrid retrieval currently supports:
+
+- `bi-encoder + graph`
+- `ColBERT + graph`
+- `ColBERT + graph selective`
+
+The selective hybrid only applies graph fusion to multi-entity queries, which is the strongest hybrid story in the final project.
 
 ## Output
 
-All results are written to the `results/` directory:
+All outputs are written under `results/`.
 
-- `benchmark_log.json` — Single source of truth: timing, GPU/RAM metrics, disk sizes, per-query results, run metadata
-- `charts/` — PNG visualizations (Recall@k bar chart, histograms, latency comparison, index size comparison)
-- `summary_statistics.csv` — Recall@k summary table with delta columns
-- `faiss_index/` — Saved FAISS index
-- `colbert_index/` — Saved ColBERT PLAID index
+Important outputs include:
 
-### JSON Log Structure
+- `results/benchmark_log.json`
+  - main benchmark log for the default run
+- `results/summary_statistics.csv`
+  - summary table for the default run
+- `results/charts/`
+  - base charts for the default benchmark
+- `results/notebook/<variant>/`
+  - per-variant notebook outputs
+- `results/notebook/colbert_graph_hybrid/`
+  - graph and hybrid retrieval summaries
+- `results/notebook/final_comparison_charts/`
+  - final comparison figures used for the report
 
-```json
-{
-  "metadata": {
-    "timestamp": "...",
-    "config": {...},
-    "gpu_device": "NVIDIA ...",
-    "gpu_total_vram_bytes": ...,
-    "corpus_size": 10000,
-    "total_chunks": ...,
-    "total_queries": ...,
-    "queries_per_group": {"single-entity": ..., "multi-entity": ...},
-    "models": {...},
-    "k_values": [1, 5, 10, 20]
-  },
-  "stages": {
-    "data_loading": {"duration_seconds": ..., "peak_vram_bytes": ..., "rss_bytes": ...},
-    ...
-  },
-  "queries": [
-    {
-      "query": "...",
-      "entity_count": 1,
-      "entity_list": ["..."],
-      "entity_group": "single-entity",
-      "ground_truth_chunk_ids": ["..."],
-      "biencoder_retrieved_ids": ["..."],
-      "biencoder_recall_at_k": {"1": ..., "5": ..., "10": ..., "20": ...},
-      "biencoder_latency_ms": ...,
-      "colbert_retrieved_ids": ["..."],
-      "colbert_recall_at_k": {"1": ..., "5": ..., "10": ..., "20": ...},
-      "colbert_latency_ms": ...
-    }
-  ],
-  "disk_sizes": {"faiss_index": ..., "colbert_index": ...}
-}
-```
+Useful files in the hybrid directory:
+
+- `graph_recall_summary.csv`
+- `biencoder_graph_hybrid_summary.csv`
+- `colbert_graph_hybrid_summary.csv`
+- `colbert_graph_selective_summary.csv`
+- `hybrid_compare_overall.csv`
+
+## Hardware Notes
+
+- ColBERT indexing is the heaviest part of the pipeline.
+- On smaller local GPUs, some indexing runs may fall back to CPU or require reduced settings.
+- For larger runs, a stronger GPU machine is recommended.
+- The notebook is designed to be run section by section to make this manageable.
 
 ## Project Structure
 
+```text
+configs/
+  experiment_config.yaml
+  quick_ablation.yaml
+
+finalreport/
+  final_report.tex
+  neurips.sty
+
+notebooks/
+  run_benchmark.ipynb
+
+reports/
+  report_en.md
+  report_zh.md
+
+src/
+  benchmark_runner.py
+  biencoder_retrieval.py
+  colbert_retrieval.py
+  data_pipeline.py
+  error_analysis.py
+  evaluation.py
+  hybrid_retrieval.py
+  knowledge_graph.py
+  learnable_boundary.py
+  profiler.py
+  visualize.py
+
+results/
+  ...
+
+requirements.txt
+README.md
 ```
-├── configs/
-│   ├── experiment_config.yaml   # Main benchmark configuration
-│   └── ablation_config.yaml     # Ablation experiment configuration
-├── doc/
-│   ├── architecture.md          # System architecture overview
-│   ├── experiment_guide.md      # Detailed experiment guide
-│   └── data_format.md           # Data format reference
-├── notebooks/
-│   └── run_benchmark.ipynb      # Demo notebook (end-to-end pipeline)
-├── src/
-│   ├── profiler.py              # Stage timing, GPU/RAM/disk profiling
-│   ├── data_pipeline.py         # KILT data loading, chunking, NER classification
-│   ├── biencoder_retrieval.py   # MiniLM encoding, FAISS indexing, retrieval
-│   ├── colbert_retrieval.py     # RAGatouille ColBERTv2 indexing, retrieval
-│   ├── evaluation.py            # Recall@k computation from JSON log
-│   ├── visualize.py             # Charts, histograms, CSV export
-│   ├── ablation.py              # Ablation test set construction
-│   └── ablation_visualize.py    # Ablation-specific visualizations
-├── results/                     # Output directory (generated)
-├── reports/                     # Experiment reports
-├── final-report/                # LaTeX report
-├── run_benchmark.py             # Main benchmark script
-├── run_ablation.py              # Ablation experiment script
-├── requirements.txt
-└── README.md
-```
+
+## Notes
+
+- The notebook is the main workflow and should be treated as the source of truth for the final experiments.
+- Some earlier experimental variants were removed from the final workflow to keep the final comparison clean.
+- The strongest final chunking baseline is `adaptive_sentence`.
+- The strongest graph-based result is the selective ColBERT+graph hybrid.
