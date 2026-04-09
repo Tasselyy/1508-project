@@ -1,6 +1,6 @@
 # ColBERTv2 vs Bi-Encoder Retrieval Benchmark
 
-A standalone benchmark comparing ColBERTv2 (late interaction) against a bi-encoder baseline (MiniLM) on the KILT NaturalQuestions dev set. Part of the ECE1508 course project "Enhancing RAG with Adaptive Chunking."
+A standalone benchmark comparing ColBERTv2 (late interaction) against a bi-encoder baseline (MiniLM) on the KILT NaturalQuestions dev set.
 
 ## Setup
 
