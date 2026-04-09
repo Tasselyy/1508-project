@@ -414,6 +414,67 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
 
 
 # ---------------------------------------------------------------------------
+# 3.3b  Fixed-length token chunking
+# ---------------------------------------------------------------------------
+
+def chunk_corpus_fixed(corpus_df: pd.DataFrame, max_tokens: int = 256) -> list[dict]:
+    """Chunk Wikipedia pages into fixed-length token windows using whitespace tokenization.
+
+    Each page's paragraphs are concatenated, split on whitespace, and grouped
+    into chunks of at most `max_tokens` tokens.  chunk_id format:
+    '{wikipedia_id}_{chunk_index}'.
+    """
+    chunks: list[dict] = []
+    for _, row in corpus_df.iterrows():
+        wid = int(row["wikipedia_id"])
+        paragraphs = row.get("paragraphs", [])
+
+        if not isinstance(paragraphs, (list, np.ndarray)):
+            paragraphs = []
+        else:
+            paragraphs = list(paragraphs)
+
+        # Concatenate all paragraph text
+        full_text = " ".join(
+            p.strip() for p in paragraphs if isinstance(p, str) and p.strip()
+        )
+        if not full_text:
+            continue
+
+        tokens = full_text.split()
+        chunk_idx = 0
+        for start in range(0, len(tokens), max_tokens):
+            chunk_text = " ".join(tokens[start : start + max_tokens])
+            chunks.append(
+                {
+                    "chunk_id": f"{wid}_{chunk_idx}",
+                    "wikipedia_id": wid,
+                    "paragraph_index": chunk_idx,
+                    "text": chunk_text,
+                }
+            )
+            chunk_idx += 1
+    return chunks
+
+
+def chunk_corpus_by_strategy(corpus_df: pd.DataFrame, strategy: str = "paragraph") -> list[dict]:
+    """Dispatch chunking based on strategy string.
+
+    Supported strategies:
+        - "paragraph": paragraph-level chunking
+        - "fixed-256": fixed 256-token windows
+        - "fixed-512": fixed 512-token windows
+        - "fixed-<N>": fixed N-token windows (any integer)
+    """
+    if strategy == "paragraph":
+        return chunk_corpus(corpus_df)
+    if strategy.startswith("fixed-"):
+        max_tokens = int(strategy.split("-", 1)[1])
+        return chunk_corpus_fixed(corpus_df, max_tokens=max_tokens)
+    raise ValueError(f"Unknown chunking strategy: {strategy!r}")
+
+
+# ---------------------------------------------------------------------------
 # 3.4  spaCy NER query classification
 # ---------------------------------------------------------------------------
 

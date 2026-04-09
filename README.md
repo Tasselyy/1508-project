@@ -1,6 +1,6 @@
 # ColBERTv2 vs Bi-Encoder Retrieval Benchmark
 
-A standalone benchmark comparing ColBERTv2 (late interaction) against a bi-encoder baseline (MiniLM) on the KILT NaturalQuestions dev set. Part of the ECE1508 course project "Enhancing RAG with Adaptive Chunking."
+A standalone benchmark comparing ColBERTv2 (late interaction) against a bi-encoder baseline (MiniLM) on the KILT NaturalQuestions dev set.
 
 ## Setup
 
@@ -72,6 +72,18 @@ Edit `configs/experiment_config.yaml` to adjust:
 
 If ColBERTv2 indexing fails due to VRAM overflow, reduce `corpus.target_size` to 5000 in the config.
 
+## Ablation Experiments
+
+Run systematic ablation studies across corpus scale, chunk granularity, and top-k depth:
+
+```bash
+python run_ablation.py
+```
+
+Configuration: `configs/ablation_config.yaml`. See `doc/experiment_guide.md` for details on each ablation dimension.
+
+Results are written to `results/ablation/`.
+
 ## Output
 
 All results are written to the `results/` directory:
@@ -125,18 +137,28 @@ All results are written to the `results/` directory:
 
 ```
 ├── configs/
-│   └── experiment_config.yaml
+│   ├── experiment_config.yaml   # Main benchmark configuration
+│   └── ablation_config.yaml     # Ablation experiment configuration
+├── doc/
+│   ├── architecture.md          # System architecture overview
+│   ├── experiment_guide.md      # Detailed experiment guide
+│   └── data_format.md           # Data format reference
 ├── notebooks/
-│   └── run_benchmark.ipynb
+│   └── run_benchmark.ipynb      # Demo notebook (end-to-end pipeline)
 ├── src/
-│   ├── profiler.py            # Stage timing, GPU/RAM/disk profiling
-│   ├── data_pipeline.py       # KILT data loading, chunking, NER classification
-│   ├── biencoder_retrieval.py # MiniLM encoding, FAISS indexing, retrieval
-│   ├── colbert_retrieval.py   # RAGatouille ColBERTv2 indexing, retrieval
-│   ├── evaluation.py          # Recall@k computation from JSON log
-│   └── visualize.py           # Charts, histograms, CSV export
-├── results/                   # Output directory (generated)
-├── reports/                   # Experiment reports
+│   ├── profiler.py              # Stage timing, GPU/RAM/disk profiling
+│   ├── data_pipeline.py         # KILT data loading, chunking, NER classification
+│   ├── biencoder_retrieval.py   # MiniLM encoding, FAISS indexing, retrieval
+│   ├── colbert_retrieval.py     # RAGatouille ColBERTv2 indexing, retrieval
+│   ├── evaluation.py            # Recall@k computation from JSON log
+│   ├── visualize.py             # Charts, histograms, CSV export
+│   ├── ablation.py              # Ablation test set construction
+│   └── ablation_visualize.py    # Ablation-specific visualizations
+├── results/                     # Output directory (generated)
+├── reports/                     # Experiment reports
+├── final-report/                # LaTeX report
+├── run_benchmark.py             # Main benchmark script
+├── run_ablation.py              # Ablation experiment script
 ├── requirements.txt
 └── README.md
 ```
