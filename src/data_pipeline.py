@@ -14,6 +14,7 @@ import spacy
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
 
+from src.learnable_boundary import LearnableBoundaryScorer, train_boundary_scorer
 from src.profiler import Profiler
 
 KILT_WIKIPEDIA_URL = "http://dl.fbaipublicfiles.com/KILT/kilt_knowledgesource.json"
@@ -27,22 +28,18 @@ _STOPWORDS = {
 _SENTENCE_ENCODER_CACHE: dict[str, SentenceTransformer] = {}
 
 
-# ---------------------------------------------------------------------------
-# 3.1  Load KILT NQ dev set
-# ---------------------------------------------------------------------------
+# --- Dataset loading -------------------------------------------------------
 
 def load_kilt_nq_dev() -> list[dict]:
     """Load KILT NaturalQuestions dev split and return as list of dicts."""
     ds = load_dataset("facebook/kilt_tasks", "nq", split="validation", trust_remote_code=True)
     records = list(ds)
-    # Free the HuggingFace Dataset object (holds Arrow memory-mapped data)
+    # The Arrow-backed dataset object can hang onto a fair bit of memory.
     del ds
     return records
 
 
-# ---------------------------------------------------------------------------
-# 3.2  Reduced corpus construction
-# ---------------------------------------------------------------------------
+# --- Reduced corpus construction ------------------------------------------
 
 def _extract_gold_page_ids(nq_records: list[dict]) -> set[int]:
     """Extract all Wikipedia page IDs referenced in query provenance."""
@@ -118,10 +115,7 @@ def build_reduced_corpus(
     cache_path: str | None = None,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Build a reduced Wikipedia corpus containing all gold pages + distractors.
-
-    Returns a DataFrame with columns: wikipedia_id, title, text (dict with paragraph list).
-    """
+    """Build a smaller Wikipedia corpus with gold pages plus distractors."""
     cache_signature = _build_cache_signature(nq_records, target_size=target_size, seed=seed)
     if cache_path:
         cached = _load_cached_corpus(cache_path, cache_signature)
@@ -156,7 +150,7 @@ def build_reduced_corpus(
             gold_pages.append(page)
             gold_ids_remaining.discard(wid)
         else:
-            # Reservoir sampling for distractors
+            # Keep random distractor
             reservoir_count += 1
             if len(distractor_reservoir) < needed_distractors:
                 distractor_reservoir.append(page)
@@ -165,23 +159,19 @@ def build_reduced_corpus(
                 if j < needed_distractors:
                     distractor_reservoir[j] = page
 
-        # Early stop once we have all gold pages and enough distractors
         if len(gold_ids_remaining) == 0 and len(distractor_reservoir) >= needed_distractors:
             break
-        # Safety limit: stop after scanning enough of the corpus (avoid 17-min full scan)
-        # Gold pages are uniformly distributed; 80%+ coverage is sufficient for benchmark
         if scanned >= 2_000_000 and len(distractor_reservoir) >= needed_distractors:
             break
 
     print(f"  Done: scanned {scanned} pages, gold={len(gold_pages)}, distractors={len(distractor_reservoir)}")
 
     all_pages = gold_pages + distractor_reservoir[:needed_distractors]
-    # Free the separate lists — all_pages has the references now
     del gold_pages, distractor_reservoir
 
     def _extract_page(p: dict) -> dict:
         text = p.get("text", [])
-        # Normalize: raw JSONL has text as list[str]; datasets lib wraps in dict
+        # The raw KILT dump stores paragraph text a little differently than the Hugging Face loader, so normalize both shapes here
         if isinstance(text, list):
             paragraphs = text
         elif isinstance(text, dict):
@@ -195,18 +185,16 @@ def build_reduced_corpus(
         }
 
     df = pd.DataFrame([_extract_page(p) for p in all_pages])
-    del all_pages  # free raw page dicts
+    del all_pages
 
-    # Cache for subsequent runs
+    # Cache corpus
     if cache_path:
         _save_cached_corpus(cache_path, df, cache_signature)
 
     return df
 
 
-# ---------------------------------------------------------------------------
-# 3.3  Paragraph-level chunking
-# ---------------------------------------------------------------------------
+# --- Chunking helpers ------------------------------------------------------
 
 def _split_sentences(text: str) -> list[str]:
     sentences = [part.strip() for part in _SENTENCE_SPLITTER.split(text) if part.strip()]
@@ -225,7 +213,7 @@ def _keyword_tokens(text: str) -> set[str]:
 
 
 def _get_sentence_encoder(model_name: str) -> SentenceTransformer:
-    """Load and cache the sentence embedding model used for semantic chunking."""
+    """Load the sentence encoder once and reuse it across semantic runs."""
     if model_name not in _SENTENCE_ENCODER_CACHE:
         _SENTENCE_ENCODER_CACHE[model_name] = SentenceTransformer(model_name)
     return _SENTENCE_ENCODER_CACHE[model_name]
@@ -256,73 +244,71 @@ def _adaptive_sentence_chunks(
     paragraph_text: str,
     min_words: int,
     max_words: int,
-) -> list[str]:
-    sentences = _split_sentences(paragraph_text)
-    chunks: list[str] = []
-    current: list[str] = []
-    current_words = 0
-
-    for sentence in sentences:
-        sentence_words = len(sentence.split())
-        if current and current_words >= min_words and current_words + sentence_words > max_words:
-            chunks.append(" ".join(current).strip())
-            current = []
-            current_words = 0
-
-        current.append(sentence)
-        current_words += sentence_words
-
-        if current_words >= max_words:
-            chunks.append(" ".join(current).strip())
-            current = []
-            current_words = 0
-
-    if current:
-        chunks.append(" ".join(current).strip())
-
-    return [chunk for chunk in chunks if chunk]
-
-
-def _adaptive_sentence_keyword_chunks(
-    paragraph_text: str,
-    min_words: int,
-    max_words: int,
     keyword_slack_words: int,
     keyword_min_overlap: int,
+    boundary_scorer: LearnableBoundaryScorer,
+    split_threshold: float,
 ) -> list[str]:
-    """Adaptive sentence chunking with a soft extension on keyword overlap."""
+    """Enhanced adaptive chunking guided by a lightweight learned boundary ranker.
+
+    Instead of firing a split as soon as one boundary crosses a threshold,
+    this variant collects candidate sentence boundaries once the chunk is large
+    enough and chooses the highest-scoring boundary before the chunk would
+    exceed its effective maximum length.
+    """
     sentences = _split_sentences(paragraph_text)
-    chunks: list[str] = []
-    current: list[str] = []
-    current_words = 0
-    current_keywords: set[str] = set()
+    if len(sentences) <= 1:
+        return [paragraph_text.strip()]
+
+    target_words = (min_words + max_words) // 2
     hard_max_words = max_words + max(0, keyword_slack_words)
+    sentence_words = [len(sentence.split()) for sentence in sentences]
+    sentence_keywords = [_keyword_tokens(sentence) for sentence in sentences]
 
-    for sentence in sentences:
-        sentence_words = len(sentence.split())
-        sentence_keywords = _keyword_tokens(sentence)
-        keyword_overlap = len(current_keywords & sentence_keywords)
-        effective_max_words = hard_max_words if keyword_overlap >= keyword_min_overlap else max_words
+    chunks: list[str] = []
+    start = 0
 
-        if current and current_words >= min_words and current_words + sentence_words > effective_max_words:
-            chunks.append(" ".join(current).strip())
-            current = []
-            current_words = 0
-            current_keywords = set()
-            effective_max_words = max_words
+    while start < len(sentences):
+        end = start + 1
+        current_words = sentence_words[start]
+        current_keywords = set(sentence_keywords[start])
+        candidates: list[tuple[int, float]] = []
 
-        current.append(sentence)
-        current_words += sentence_words
-        current_keywords.update(sentence_keywords)
+        while end < len(sentences):
+            next_sentence = sentences[end]
+            next_words = sentence_words[end]
+            next_keywords = sentence_keywords[end]
+            overlap = len(current_keywords & next_keywords)
+            effective_max_words = hard_max_words if overlap >= keyword_min_overlap else max_words
 
-        if current_words >= effective_max_words:
-            chunks.append(" ".join(current).strip())
-            current = []
-            current_words = 0
-            current_keywords = set()
+            if current_words >= min_words:
+                boundary_prob = boundary_scorer.predict_proba(sentences[end - 1], next_sentence)
+                size_penalty = abs(current_words - target_words) / max(1, max_words - min_words)
+                adjusted_score = boundary_prob - 0.15 * size_penalty
+                if boundary_prob >= split_threshold:
+                    adjusted_score += 0.05
+                candidates.append((end, adjusted_score))
 
-    if current:
-        chunks.append(" ".join(current).strip())
+            if current_words + next_words > effective_max_words:
+                break
+
+            current_words += next_words
+            current_keywords.update(next_keywords)
+            end += 1
+
+        if end >= len(sentences):
+            chunks.append(" ".join(sentences[start:]).strip())
+            break
+
+        if candidates:
+            split_at = max(candidates, key=lambda item: item[1])[0]
+            if split_at <= start:
+                split_at = end
+        else:
+            split_at = end
+
+        chunks.append(" ".join(sentences[start:split_at]).strip())
+        start = split_at
 
     return [chunk for chunk in chunks if chunk]
 
@@ -407,12 +393,26 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
     adaptive_max_words = max(adaptive_min_words, int(chunking_config.get("adaptive_max_words", 160)))
     adaptive_keyword_slack_words = max(0, int(chunking_config.get("adaptive_keyword_slack_words", 40)))
     adaptive_keyword_min_overlap = max(1, int(chunking_config.get("adaptive_keyword_min_overlap", 1)))
+    learned_boundary_hidden_dim = max(8, int(chunking_config.get("learned_boundary_hidden_dim", 32)))
+    learned_boundary_epochs = max(1, int(chunking_config.get("learned_boundary_epochs", 15)))
+    learned_boundary_batch_size = max(16, int(chunking_config.get("learned_boundary_batch_size", 128)))
+    learned_boundary_learning_rate = float(chunking_config.get("learned_boundary_learning_rate", 1e-3))
+    learned_boundary_split_threshold = float(chunking_config.get("learned_boundary_split_threshold", 0.55))
     semantic_model = chunking_config.get("semantic_model", "sentence-transformers/all-MiniLM-L6-v2")
     semantic_similarity_threshold = float(chunking_config.get("semantic_similarity_threshold", 0.72))
     semantic_min_words = max(1, int(chunking_config.get("semantic_min_words", 80)))
     semantic_max_words = max(semantic_min_words, int(chunking_config.get("semantic_max_words", 160)))
     semantic_min_sentences = max(1, int(chunking_config.get("semantic_min_sentences", 2)))
     semantic_max_sentences = max(semantic_min_sentences, int(chunking_config.get("semantic_max_sentences", 6)))
+    learned_boundary_scorer = None
+    if strategy == "adaptive_sentence":
+        learned_boundary_scorer = train_boundary_scorer(
+            corpus_df,
+            hidden_dim=learned_boundary_hidden_dim,
+            epochs=learned_boundary_epochs,
+            batch_size=learned_boundary_batch_size,
+            learning_rate=learned_boundary_learning_rate,
+        )
 
     chunks: list[dict] = []
     for _, row in corpus_df.iterrows():
@@ -444,14 +444,10 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
                     para_text,
                     min_words=adaptive_min_words,
                     max_words=adaptive_max_words,
-                )
-            elif strategy == "adaptive_sentence_keyword":
-                derived_chunks = _adaptive_sentence_keyword_chunks(
-                    para_text,
-                    min_words=adaptive_min_words,
-                    max_words=adaptive_max_words,
                     keyword_slack_words=adaptive_keyword_slack_words,
                     keyword_min_overlap=adaptive_keyword_min_overlap,
+                    boundary_scorer=learned_boundary_scorer,
+                    split_threshold=learned_boundary_split_threshold,
                 )
             elif strategy == "semantic_similarity":
                 derived_chunks = _semantic_similarity_chunks(
@@ -484,9 +480,7 @@ def chunk_corpus(corpus_df: pd.DataFrame, chunking_config: dict | None = None) -
     return chunks
 
 
-# ---------------------------------------------------------------------------
-# 3.3b  Fixed-length token chunking
-# ---------------------------------------------------------------------------
+# --- Fixed-window chunking ------------------------------------
 
 def chunk_corpus_fixed(corpus_df: pd.DataFrame, max_tokens: int = 256) -> list[dict]:
     """Chunk Wikipedia pages into fixed-length token windows using whitespace tokenization.
@@ -505,7 +499,6 @@ def chunk_corpus_fixed(corpus_df: pd.DataFrame, max_tokens: int = 256) -> list[d
         else:
             paragraphs = list(paragraphs)
 
-        # Concatenate all paragraph text
         full_text = " ".join(
             p.strip() for p in paragraphs if isinstance(p, str) and p.strip()
         )
@@ -545,9 +538,7 @@ def chunk_corpus_by_strategy(corpus_df: pd.DataFrame, strategy: str = "paragraph
     raise ValueError(f"Unknown chunking strategy: {strategy!r}")
 
 
-# ---------------------------------------------------------------------------
-# 3.4  spaCy NER query classification
-# ---------------------------------------------------------------------------
+# --- Query grouping --------------------------------------------------------
 
 def classify_queries_ner(
     nq_records: list[dict],
@@ -580,9 +571,7 @@ def classify_queries_ner(
     return classified
 
 
-# ---------------------------------------------------------------------------
-# 3.5  Balanced query sampling
-# ---------------------------------------------------------------------------
+# --- Balanced query sampling ----------------------------------------------
 
 def sample_balanced_queries(
     classified_queries: list[dict],
@@ -602,9 +591,7 @@ def sample_balanced_queries(
     return sampled
 
 
-# ---------------------------------------------------------------------------
-# 3.6  Ground-truth label extraction
-# ---------------------------------------------------------------------------
+# --- Ground-truth extraction ----------------------------------------------
 
 def extract_ground_truth(query_record: dict) -> set[str]:
     """Extract ground-truth chunk IDs from a KILT record's provenance.
@@ -616,7 +603,7 @@ def extract_ground_truth(query_record: dict) -> set[str]:
     for out in rec.get("output", []):
         for prov in out.get("provenance", []):
             wid = prov.get("wikipedia_id")
-            # KILT provenance uses start/end paragraph indices
+            # KILT provenance points to paragraph ranges on a page.
             start_par = prov.get("start_paragraph_id", 0)
             end_par = prov.get("end_paragraph_id", start_par)
             if wid is not None:
@@ -625,9 +612,7 @@ def extract_ground_truth(query_record: dict) -> set[str]:
     return gt_ids
 
 
-# ---------------------------------------------------------------------------
-# 3.7  Full pipeline with profiler instrumentation
-# ---------------------------------------------------------------------------
+# --- End-to-end data pipeline ---------------------------------------------
 
 def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     """Execute the full data pipeline, instrumented with profiler.
@@ -643,19 +628,16 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     sample_per_group = config["queries"]["sample_size_per_group"]
     query_seed = config["queries"].get("seed", 42)
 
-    # Load NQ dev set
+    # Start with the full KILT NQ validation split.
     profiler.start_stage("data_loading")
     nq_records = load_kilt_nq_dev()
     profiler.end_stage("data_loading")
 
-    # Pre-sample a smaller candidate pool before running NER on all 13K records.
-    # We need sample_per_group * 2 groups in the end; take 4x headroom to ensure
-    # enough queries in each entity group after NER classification.
+    # Running spaCy over every query is unnecessary, so we first take a roomy candidate pool and balance it after NER classification
     profiler.start_stage("ner_classification")
     candidate_size = min(len(nq_records), sample_per_group * 8)
     rng = random.Random(query_seed)
     candidates = rng.sample(nq_records, candidate_size)
-    # Free the full dataset immediately — candidates hold the only needed refs
     del nq_records
 
     classified = classify_queries_ner(
@@ -666,7 +648,6 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     del candidates
     profiler.end_stage("ner_classification")
 
-    # Balanced sampling (before corpus construction to reduce gold page set)
     profiler.start_stage("query_sampling")
     sampled = sample_balanced_queries(
         classified,
@@ -675,11 +656,10 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     )
     profiler.end_stage("query_sampling")
 
-    # Free classified list (sampled queries hold their own refs)
     del classified
     gc.collect()
 
-    # Build reduced corpus using only gold pages for sampled queries
+    # Build the reduced corpus using only the sampled queries' provenance
     profiler.start_stage("corpus_construction")
     corpus_df = build_reduced_corpus(
         [q["record"] for q in sampled],  # only sampled query records
@@ -689,7 +669,7 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     )
     profiler.end_stage("corpus_construction")
 
-    # Chunk corpus and free DataFrame immediately
+    # Chunk the corpus
     profiler.start_stage("chunking")
     chunks = chunk_corpus(corpus_df, chunking_config=config.get("chunking", {}))
     corpus_size = len(corpus_df)
@@ -697,15 +677,15 @@ def run_data_pipeline(config: dict, profiler: Profiler) -> dict:
     gc.collect()
     profiler.end_stage("chunking")
 
-    # Add ground-truth chunk IDs to each sampled query
+    # Attach gold chunk
     for q in sampled:
         q["ground_truth_chunk_ids"] = list(extract_ground_truth(q))
 
-    # Drop heavy 'record' reference from sampled queries — no longer needed
+    # Drop heavy 'record'
     for q in sampled:
         q.pop("record", None)
 
-    # Store corpus metadata
+    # Save metadata
     profiler.data["metadata"]["corpus_size"] = corpus_size
     profiler.data["metadata"]["total_chunks"] = len(chunks)
     profiler.data["metadata"]["total_queries"] = len(sampled)

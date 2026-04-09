@@ -33,7 +33,7 @@ def deep_update(base: dict, overrides: dict) -> dict:
 
 
 def configure_run_paths(base_config: dict, run_subdir: str, cache_suffix: str | None = None) -> dict:
-    """Route one benchmark run to a dedicated result directory."""
+    """Give one benchmark run its own result directory and optional cache name."""
     config = deepcopy(base_config)
     result_root = Path(base_config["paths"]["results_dir"]) / run_subdir
     result_root.mkdir(parents=True, exist_ok=True)
@@ -94,7 +94,7 @@ def run_full_benchmark(
     save_outputs: bool = True,
     generate_visualizations: bool = True,
 ) -> dict:
-    """Run the full benchmark and optionally persist outputs."""
+    """Run the benchmark end to end and optionally write the usual outputs."""
     profiler = Profiler(config=config)
 
     pipeline_out = run_data_pipeline(config, profiler)

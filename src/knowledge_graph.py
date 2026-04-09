@@ -42,7 +42,7 @@ def extract_chunk_entities(chunks: list[dict], spacy_model: str) -> dict[str, li
 
 
 def build_knowledge_graph(chunks: list[dict], spacy_model: str = "en_core_web_sm") -> dict:
-    """Build a lightweight entity co-occurrence graph over chunks."""
+    """Build the lightweight entity co-occurrence graph used in the prototype."""
     chunk_entities = extract_chunk_entities(chunks, spacy_model=spacy_model)
     entity_to_chunks: dict[str, set[str]] = defaultdict(set)
     entity_to_pages: dict[str, set[int]] = defaultdict(set)
@@ -104,7 +104,7 @@ def retrieve_top_k_graph(
     k: int = 20,
     spacy_model: str = "en_core_web_sm",
 ) -> tuple[list[str], list[str]]:
-    """Retrieve chunk IDs by matching query entities against the graph."""
+    """Score chunks by direct entity matches plus simple co-occurrence links."""
     query_entities = extract_query_entities(query, spacy_model=spacy_model)
     if not query_entities:
         return [], []

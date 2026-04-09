@@ -1,4 +1,4 @@
-# Small, faster config for early chunking ablation runs.
+# Small config for early chunking ablation
 
 corpus:
   target_size: 150
@@ -9,10 +9,15 @@ chunking:
   strategy: "paragraph"
   sentence_window_size: 3
   sentence_window_stride: 2
-  adaptive_min_words: 60
-  adaptive_max_words: 120
+  adaptive_min_words: 80
+  adaptive_max_words: 160
   adaptive_keyword_slack_words: 40
   adaptive_keyword_min_overlap: 1
+  learned_boundary_hidden_dim: 32
+  learned_boundary_epochs: 12
+  learned_boundary_batch_size: 128
+  learned_boundary_learning_rate: 0.001
+  learned_boundary_split_threshold: 0.55
   semantic_model: "sentence-transformers/all-MiniLM-L6-v2"
   semantic_similarity_threshold: 0.72
   semantic_min_words: 60

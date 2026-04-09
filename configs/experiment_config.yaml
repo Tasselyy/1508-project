@@ -1,18 +1,23 @@
 # ColBERT vs Bi-Encoder Retrieval Benchmark Configuration
 
 corpus:
-  target_size: 500            # Number of Wikipedia pages in reduced corpus (reduced for 8GB VRAM)
+  target_size: 500            # Number of Wikipedia pages
   local_corpus_cache: "data/corpus_cache.parquet"
   seed: 42
 
 chunking:
-  strategy: "paragraph"       # Fixed paragraph-level chunking
-  sentence_window_size: 3     # Number of sentences per chunk for sentence_window
-  sentence_window_stride: 2   # Sliding stride for sentence_window
-  adaptive_min_words: 80      # Lower target for adaptive_sentence chunks
-  adaptive_max_words: 160     # Upper target for adaptive_sentence chunks
+  strategy: "paragraph"       # Fixed paragraph chunking as baseline
+  sentence_window_size: 3
+  sentence_window_stride: 2
+  adaptive_min_words: 80
+  adaptive_max_words: 160
   adaptive_keyword_slack_words: 40
   adaptive_keyword_min_overlap: 1
+  learned_boundary_hidden_dim: 32
+  learned_boundary_epochs: 15
+  learned_boundary_batch_size: 128
+  learned_boundary_learning_rate: 0.001
+  learned_boundary_split_threshold: 0.55
   semantic_model: "sentence-transformers/all-MiniLM-L6-v2"
   semantic_similarity_threshold: 0.72
   semantic_min_words: 80
@@ -21,7 +26,7 @@ chunking:
   semantic_max_sentences: 6
 
 queries:
-  sample_size_per_group: 150  # Queries per entity group (single-entity, multi-entity)
+  sample_size_per_group: 150  # Queries per entity group single-entity/multi-entity
   seed: 42
 
 retrieval:
@@ -32,7 +37,7 @@ models:
   colbert: "colbert-ir/colbertv2.0"
 
 colbert:
-  bsize: 32                   # Encoding batch size during indexing (lower = less VRAM; try 16 for 8GB)
+  bsize: 32                   # Encoding batch size during indexing
 
 paths:
   results_dir: "results"
