@@ -1,3 +1,5 @@
+final-report/
+# Tool config
 .claude/
 CLAUDE.md
 openspec/
@@ -46,3 +48,10 @@ data/
 results/faiss_index/
 results/colbert_index/
 results/ablation/
+
+# LaTeX build artifacts
+final-report/*.aux
+final-report/*.bbl
+final-report/*.blg
+final-report/*.out
+final-report/*.synctex.gz
