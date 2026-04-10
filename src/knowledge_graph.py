@@ -104,26 +104,42 @@ def retrieve_top_k_graph(
     k: int = 20,
     spacy_model: str = "en_core_web_sm",
 ) -> tuple[list[str], list[str]]:
-    """Score chunks by direct entity matches plus simple co-occurrence links."""
+    # Score chunks by direct entity matches plus IDF-weighted co-occurrence links.
     query_entities = extract_query_entities(query, spacy_model=spacy_model)
     if not query_entities:
         return [], []
 
     scores: defaultdict[str, float] = defaultdict(float)
     chunk_entities = graph["chunk_entities"]
+    num_chunks = graph["metadata"].get("num_chunks", 1000)
 
+    # IDF function to weight entities by their informativeness
+    def get_idf(ent: str) -> float:
+        degree = graph["entity_degree"].get(ent, 0)
+        if degree == 0:
+            return 0.0
+        #
+        return max(0.1, math.log(num_chunks / degree))
+
+    # Look up direct matches and boost by a large constant times IDF to prioritize chunks that mention important query entities
     for entity in query_entities:
+        idf = get_idf(entity)
         for chunk_id in graph["entity_to_chunks"].get(entity, []):
-            scores[chunk_id] += 2.0
+            # Direct matches get a strong boost 
+            scores[chunk_id] += 10.0 * idf
 
+    # Look up co-occurrence links from query entities to other entities in chunks, and boost by log-weighted co-occurrence * IDF
     for chunk_id, entities in chunk_entities.items():
         for query_entity in query_entities:
             for entity in entities:
                 if entity == query_entity:
                     continue
                 weight = _cooccurrence_lookup(graph, query_entity, entity)
-                if weight > 0:
-                    scores[chunk_id] += min(1.0, math.log1p(weight) / 2)
+                # require at least 2 co-occurrences to consider the link, to reduce noise
+                if weight >= 2:
+                    idf = get_idf(entity)
+                    # use log1p to dampen the effect of very high co-occurrence counts, and multiply by IDF to prioritize informative entities.
+                    scores[chunk_id] += (math.log1p(weight) * idf) * 0.5
 
     ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     return [chunk_id for chunk_id, _ in ranked[:k]], query_entities

@@ -13,7 +13,7 @@ def reciprocal_rank_fusion(
     rankings: dict[str, list[str]],
     *,
     weights: dict[str, float] | None = None,
-    rrf_k: int = 60,
+    rrf_k: int = 10,
     max_candidates: int | None = None,
 ) -> list[str]:
     """Fuse multiple rankings with Reciprocal Rank Fusion (RRF)."""
@@ -40,7 +40,7 @@ def run_hybrid_retrieval(
     output_prefix: str,
     k_values: list[int],
     primary_weight: float = 1.0,
-    graph_weight: float = 0.7,
+    graph_weight: float = 0.3,
     rrf_k: int = 60,
 ) -> None:
     """Populate fused rankings and Recall@k on sampled queries.
