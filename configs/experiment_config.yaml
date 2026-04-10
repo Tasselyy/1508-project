@@ -1,43 +1,43 @@
-# ColBERT vs Bi-Encoder Retrieval Benchmark Configuration
+# Small config for early chunking ablation
 
 corpus:
-  target_size: 500            # Number of Wikipedia pages
-  local_corpus_cache: "data/corpus_cache.parquet"
-  seed: 42
+  target_size: 500
+  local_corpus_cache: "data/corpus_cache_quick.parquet"
+  seed: 10
 
 chunking:
-  strategy: "paragraph"       # Fixed paragraph chunking as baseline
+  strategy: "paragraph"
   sentence_window_size: 3
   sentence_window_stride: 2
   adaptive_min_words: 80
-  adaptive_max_words: 160
+  adaptive_max_words: 180
   adaptive_keyword_slack_words: 40
   adaptive_keyword_min_overlap: 1
   learned_boundary_hidden_dim: 32
-  learned_boundary_epochs: 15
+  learned_boundary_epochs: 12
   learned_boundary_batch_size: 128
   learned_boundary_learning_rate: 0.001
   learned_boundary_split_threshold: 0.55
-  semantic_model: "sentence-transformers/all-MiniLM-L6-v2"
-  semantic_similarity_threshold: 0.72
-  semantic_min_words: 80
-  semantic_max_words: 160
+  semantic_model: "BAAI/bge-small-en-v1.5"
+  semantic_similarity_threshold: 0.65
+  semantic_min_words: 60
+  semantic_max_words: 120
   semantic_min_sentences: 2
-  semantic_max_sentences: 6
+  semantic_max_sentences: 5
 
 queries:
-  sample_size_per_group: 150  # Queries per entity group single-entity/multi-entity
-  seed: 42
+  sample_size_per_group: 50
+  seed: 10
 
 retrieval:
   k_values: [1, 5, 10, 20]
 
 models:
-  biencoder: "sentence-transformers/all-MiniLM-L6-v2"
+  biencoder: "BAAI/bge-small-en-v1.5"
   colbert: "colbert-ir/colbertv2.0"
 
 colbert:
-  bsize: 32                   # Encoding batch size during indexing
+  bsize: 8
 
 paths:
   results_dir: "results"
@@ -49,4 +49,4 @@ paths:
 
 spacy:
   model: "en_core_web_sm"
-  entity_threshold: 2         # 0-1 entities = single-entity, 2+ = multi-entity
+  entity_threshold: 2
