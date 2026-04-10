@@ -13,6 +13,7 @@ from src.data_pipeline import run_data_pipeline
 from src.evaluation import run_evaluation
 from src.profiler import Profiler
 from src.visualize import run_visualization
+from src.generation import run_generation_step
 
 
 def load_config(path: str = "configs/experiment_config.yaml") -> dict:
@@ -73,6 +74,10 @@ def _log_query_results(sampled_queries: list[dict], profiler: Profiler, config: 
             "entity_group": q["entity_group"],
             "ground_truth_chunk_ids": q["ground_truth_chunk_ids"],
         }
+
+        if "generated_answer" in q:
+            record["generated_answer"] = q["generated_answer"]
+
         for key in (
             "biencoder_retrieved_ids",
             "biencoder_recall_at_k",
@@ -105,6 +110,10 @@ def run_full_benchmark(
 
     run_biencoder_retrieval(chunks, sampled_queries, config, profiler)
     run_colbert_retrieval(chunks, sampled_queries, config, profiler)
+
+    profiler.start_stage("llm_generation")
+    run_generation_step(sampled_queries, chunks, top_k=3)
+    profiler.end_stage("llm_generation")
 
     _log_query_results(sampled_queries, profiler, config)
 
